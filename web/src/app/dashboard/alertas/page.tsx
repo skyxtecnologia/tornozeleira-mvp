@@ -16,12 +16,12 @@ const prisma = new PrismaClient();
 export const dynamic = "force-dynamic";
 
 export default async function AlertasPage() {
-	// Busca o histórico de alertas
 	const alertas = await prisma.alerta.findMany({
 		include: {
 			monitorado: true,
 		},
 		orderBy: { timestamp: "desc" },
+		take: 50,
 	});
 
 	// Função auxiliar para cor do nível
@@ -63,7 +63,9 @@ export default async function AlertasPage() {
 
 			<div className="border border-slate-800 rounded-md bg-slate-950/50 backdrop-blur-sm">
 				<Table>
-					<TableCaption>Log inalterável de auditoria de eventos.</TableCaption>
+					<TableCaption>
+						Exibindo as 50 ocorrências mais recentes do sistema (Paginação MVP).
+					</TableCaption>
 					<TableHeader>
 						<TableRow className="border-slate-800">
 							<TableHead className="w-[180px]">Data / Hora</TableHead>

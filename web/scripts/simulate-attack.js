@@ -66,11 +66,11 @@ async function run() {
 	);
 	console.log(`Agressor: ${medida.agressor.nome}`);
 
-	// Posições base em Porto Alegre
-	const vitimaPos = { lat: -30.033, lng: -51.23 };
+	// Posições base em Macaé/RJ
+	const vitimaPos = { lat: -22.3789, lng: -41.7766 };
 
-	// Agressor começa a 2km de distância (exemplo simplificado: offset na longitude)
-	let agressorPos = { lat: -30.033, lng: -51.21 };
+	// Agressor começa a certa distância
+	let agressorPos = { lat: -22.3700, lng: -41.7650 };
 
 	// Registra a vítima parada
 	await fetch("http://localhost:3000/api/telemetry", {

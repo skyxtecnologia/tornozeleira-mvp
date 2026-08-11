@@ -1,7 +1,8 @@
 const Database = require("better-sqlite3");
 const path = require("node:path");
+const bcrypt = require("bcryptjs");
 
-const dbPath = path.join(__dirname, "../dev.db");
+const dbPath = path.join(__dirname, "../prisma/dev.db");
 const db = new Database(dbPath);
 
 console.log("Populando banco de dados usando SQLite nativo...");
@@ -14,8 +15,25 @@ try {
 	db.prepare("DELETE FROM MedidaProtetiva").run();
 	db.prepare("DELETE FROM Monitorado").run();
 	db.prepare("DELETE FROM Dispositivo").run();
+	db.prepare("DELETE FROM Usuario").run();
 
 	const now = new Date().toISOString();
+
+	// Cria Usuário Admin
+	const salt = bcrypt.genSaltSync(10);
+	const hash = bcrypt.hashSync("admin123", salt);
+	db.prepare(`
+    INSERT INTO Usuario (id, nome, email, senhaHash, role, criadoEm, atualizadoEm)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+		"admin-1",
+		"Administrador (Guarda Municipal)",
+		"admin@skyx.com.br",
+		hash,
+		"ADMIN",
+		now,
+		now,
+	);
 
 	// Cria Dispositivos
 	db.prepare(`
@@ -80,8 +98,37 @@ try {
 		now,
 	);
 
+	// Cria Zonas de Exclusão Estáticas para a Medida (Em Macaé)
+	db.prepare(`
+    INSERT INTO Zona (id, medidaProtetivaId, tipo, formato, coordenadas, raioMetros, ativa, criadoEm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+		"zona-casa",
+		"medida-1",
+		"EXCLUSAO",
+		"CIRCULO",
+		JSON.stringify([{ lat: -22.3789, lng: -41.7766 }]), // Casa da vítima
+		200, // 200m de raio
+		1,
+		now,
+	);
+
+	db.prepare(`
+    INSERT INTO Zona (id, medidaProtetivaId, tipo, formato, coordenadas, raioMetros, ativa, criadoEm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+		"zona-trabalho",
+		"medida-1",
+		"EXCLUSAO",
+		"CIRCULO",
+		JSON.stringify([{ lat: -22.3820, lng: -41.7710 }]), // Trabalho da Vítima
+		150, // 150m de raio
+		1,
+		now,
+	);
+
 	console.log(
-		"✅ Seed executado com sucesso! Agressor e Vítima de teste criados.",
+		"✅ Seed executado com sucesso! Agressor, Vítima e Zonas (Macaé) de teste criados.",
 	);
 } catch (error) {
 	console.error("Erro ao popular banco:", error);
