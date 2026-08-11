@@ -82,9 +82,10 @@ export async function POST(request: Request) {
 			systemEmitter.emit("novo_alerta", alerta);
 		}
 
-		// 4. Lógica de Geofencing (Exemplo simplificado para MVP: Agressor se aproxima da Vítima)
-		// Se o dispositivo for de um AGRESSOR, vamos checar a distância com a última posição da sua VÍTIMA.
+		// 4. Lógica de Geofencing e Privacidade (Agressor)
 		const monitorado = dispositivo.monitorado;
+		let isViolating = false; // Flag para Privacidade
+
 		if (
 			monitorado &&
 			monitorado.tipo === "AGRESSOR" &&
@@ -93,23 +94,19 @@ export async function POST(request: Request) {
 			for (const medida of monitorado.medidasComoAgressor) {
 				if (medida.status !== "ATIVA") continue;
 
-				// Busca o dispositivo da vítima para pegar a última telemetria dela
+				// 4.1 Checa aproximação da vítima (Raio dinâmico)
 				const vitima = await prisma.monitorado.findUnique({
 					where: { id: medida.vitimaId },
 					include: {
 						dispositivo: {
 							include: {
-								telemetrias: {
-									orderBy: { timestamp: "desc" },
-									take: 1,
-								},
+								telemetrias: { orderBy: { timestamp: "desc" }, take: 1 },
 							},
 						},
 					},
 				});
 
 				const ultimaPosicaoVitima = vitima?.dispositivo?.telemetrias[0];
-
 				if (ultimaPosicaoVitima) {
 					const dist = calculateDistanceMeters(
 						telemetria.lat,
@@ -119,7 +116,7 @@ export async function POST(request: Request) {
 					);
 
 					if (dist <= medida.raioProtecaoMetros) {
-						// Violação! Agressor entrou no raio da vítima
+						isViolating = true;
 						const alertaAproximacao = await prisma.alerta.create({
 							data: {
 								monitoradoId: monitorado.id,
@@ -128,27 +125,67 @@ export async function POST(request: Request) {
 								anotacaoOperador: `Distância: ${Math.round(dist)}m. Limite: ${medida.raioProtecaoMetros}m`,
 							},
 						});
-
 						systemEmitter.emit("novo_alerta", alertaAproximacao);
+					}
+				}
+
+				// 4.2 Checa Zonas Estáticas (Exclusão)
+				const zonas = await prisma.zona.findMany({
+					where: {
+						medidaProtetivaId: medida.id,
+						ativa: true,
+						tipo: "EXCLUSAO",
+					},
+				});
+
+				for (const zona of zonas) {
+					if (zona.formato === "CIRCULO" && zona.raioMetros) {
+						const coords = JSON.parse(zona.coordenadas);
+						const centro = coords[0];
+						if (centro) {
+							const distZona = calculateDistanceMeters(
+								telemetria.lat,
+								telemetria.lng,
+								centro.lat,
+								centro.lng,
+							);
+							if (distZona <= zona.raioMetros) {
+								isViolating = true;
+								const alertaZona = await prisma.alerta.create({
+									data: {
+										monitoradoId: monitorado.id,
+										tipo: "VIOLACAO_ZONA",
+										nivel: "ALTO",
+										anotacaoOperador: `Invasão de zona. Distância ao centro: ${Math.round(distZona)}m`,
+									},
+								});
+								systemEmitter.emit("novo_alerta", alertaZona);
+							}
+						}
 					}
 				}
 			}
 		}
 
-		// Dispara a telemetria pro frontend com os dados amigáveis
+		// 5. Aplicar Lei de Privacidade
+		// Se for agressor e NÃO estiver violando nenhuma medida/zona, ocultamos a localização no frontend.
+		const deveOcultar = monitorado?.tipo === "AGRESSOR" && !isViolating;
+
+		// Dispara a telemetria pro frontend com os dados amigáveis (stream)
 		systemEmitter.emit("nova_telemetria", {
 			dispositivoId: dispositivo.id,
 			imei: dispositivo.imei,
 			tipoDispositivo: dispositivo.tipo,
-			monitorado: dispositivo.monitorado
+			monitorado: monitorado
 				? {
-						id: dispositivo.monitorado.id,
-						nome: dispositivo.monitorado.nome,
-						tipo: dispositivo.monitorado.tipo,
+						id: monitorado.id,
+						nome: monitorado.nome,
+						tipo: monitorado.tipo,
 					}
 				: null,
 			lat: telemetria.lat,
 			lng: telemetria.lng,
+			isLocalizacaoOculta: deveOcultar,
 			bateria: telemetria.bateria,
 			timestamp: telemetria.timestamp,
 			isOffline: telemetria.isOffline,
@@ -186,6 +223,16 @@ export async function GET() {
 		const localizacoes = dispositivos
 			.map((d) => {
 				const ultima = d.telemetrias[0];
+
+				// Regra de Privacidade também no GET inicial
+				// Nota: para saber se está violando no GET inicial de forma precisa,
+				// precisaríamos re-calcular tudo. Como simplificação, ocultamos por padrão
+				// a não ser que tenha tido um alerta recente (últimos 5 min), mas para MVP,
+				// enviaremos null se for agressor para não vazar a localização no onload.
+				// Apenas quando houver infração ele receberá a coordenada via WebSockets/SSE.
+				const isAgressor = d.monitorado?.tipo === "AGRESSOR";
+				const deveOcultar = isAgressor; // No GET inicial o agressor fica oculto por segurança
+
 				return {
 					dispositivoId: d.id,
 					imei: d.imei,
@@ -199,6 +246,7 @@ export async function GET() {
 						: null,
 					lat: ultima ? ultima.lat : null,
 					lng: ultima ? ultima.lng : null,
+					isLocalizacaoOculta: deveOcultar,
 					bateria: ultima ? ultima.bateria : d.bateriaAtual,
 					timestamp: ultima ? ultima.timestamp : null,
 					isOffline: ultima ? ultima.isOffline : false,

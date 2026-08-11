@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import MapComponent, { Layer, Marker, Source } from "react-map-gl/mapbox";
-import "mapbox-gl/dist/mapbox-gl.css";
+import MapComponent, { Layer, Marker, Source } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
 import circle from "@turf/circle";
 import {
 	AlertTriangle,
@@ -16,9 +16,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Token temporário ou carregar do env
-const _MAPBOX_TOKEN =
-	"pk.eyJ1IjoibW9ja3VzZXIiLCJhIjoiY2xwM2NqZzJtMDV2eDJxcWk5bHg4bW95byJ9.MOCK_TOKEN_HERE";
+// Estilo 100% gratuito e open-source usando OpenStreetMap Raster Tiles
+const MAPLIBRE_STYLE = {
+	version: 8,
+	sources: {
+		osm: {
+			type: "raster",
+			tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+			tileSize: 256,
+			attribution: "&copy; OpenStreetMap Contributors",
+		},
+	},
+	layers: [
+		{
+			id: "osm-tiles",
+			type: "raster",
+			source: "osm",
+			minzoom: 0,
+			maxzoom: 19,
+		},
+	],
+};
 
 interface Localizacao {
 	dispositivoId: string;
@@ -29,24 +47,36 @@ interface Localizacao {
 		nome: string;
 		tipo: string;
 	} | null;
-	lat: number;
-	lng: number;
+	lat: number | null;
+	lng: number | null;
 	bateria: number;
 	timestamp: string;
 	isOffline: boolean;
+	isLocalizacaoOculta?: boolean;
 }
 
 interface Alerta {
+	id: string;
 	tipo: string;
 	nivel: string;
 	anotacaoOperador?: string;
 }
 
+interface Zona {
+	id: string;
+	tipo: string;
+	formato: string;
+	coordenadas: string;
+	raioMetros: number | null;
+}
+
 interface MedidaAtiva {
 	id: string;
+	numeroProcesso: string;
 	raioProtecaoMetros: number;
 	agressor: { id: string; nome: string; dispositivoId: string };
 	vitima: { id: string; nome: string; dispositivoId: string };
+	zonas: Zona[];
 }
 
 function calcDist(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -64,14 +94,26 @@ function calcDist(lat1: number, lon1: number, lat2: number, lon2: number) {
 export default function TacticalMonitorPage() {
 	const [pontos, setPontos] = useState<Localizacao[]>([]);
 	const [alertaAtivo, setAlertaAtivo] = useState<Alerta | null>(null);
+	const [anotacaoDespacho, setAnotacaoDespacho] = useState("");
+	const [isDespachando, setIsDespachando] = useState(false);
 	const [medidas, setMedidas] = useState<MedidaAtiva[]>([]);
 	const [historicoRastro, setHistoricoRastro] = useState<
 		Record<string, { lng: number; lat: number }[]>
 	>({});
 
+	interface MedidaProcessada extends MedidaAtiva {
+		locAgressor?: Localizacao;
+		locVitima?: Localizacao;
+		distancia?: number | null;
+		statusRisco: string;
+	}
+
 	// Estado do Mapa Modal
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const [medidaSelecionada, setMedidaSelecionada] = useState<any>(null);
+	const [medidaSelecionada, setMedidaSelecionada] =
+		useState<MedidaProcessada | null>(null);
+	
+	// Estado de Override de Privacidade (Modo Teste)
+	const [forceVisibility, setForceVisibility] = useState(false);
 
 	useEffect(() => {
 		const fetchData = async () => {
@@ -87,7 +129,11 @@ export default function TacticalMonitorPage() {
 					const initialHistory: Record<string, { lng: number; lat: number }[]> =
 						{};
 					data.forEach((p: Localizacao) => {
-						initialHistory[p.dispositivoId] = [{ lng: p.lng, lat: p.lat }];
+						if (p.lng !== null && p.lat !== null) {
+							initialHistory[p.dispositivoId] = [{ lng: p.lng, lat: p.lat }];
+						} else {
+							initialHistory[p.dispositivoId] = [];
+						}
 					});
 					setHistoricoRastro(initialHistory);
 				}
@@ -127,6 +173,11 @@ export default function TacticalMonitorPage() {
 					) {
 						return prev;
 					}
+
+					if (novaLocalizacao.lng === null || novaLocalizacao.lat === null) {
+						return prev; // Não adiciona ao rastro se estiver oculto
+					}
+
 					return {
 						...prev,
 						[novaLocalizacao.dispositivoId]: [
@@ -142,13 +193,38 @@ export default function TacticalMonitorPage() {
 
 		eventSource.addEventListener("alerta", (event) => {
 			const alerta = JSON.parse(event.data);
-			setAlertaAtivo(alerta);
+			// Evitar que o modal abra novamente se o alerta já estiver sendo tratado
+			setAlertaAtivo((prev) => {
+				if (prev && prev.id === alerta.id) return prev;
+				return alerta;
+			});
 		});
 
 		return () => {
 			eventSource.close();
 		};
 	}, []);
+
+	const handleDespacharViatura = async () => {
+		if (!alertaAtivo?.id) return;
+		setIsDespachando(true);
+		try {
+			await fetch("/api/alertas/resolver", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					alertaId: alertaAtivo.id,
+					anotacaoOperador: anotacaoDespacho,
+				}),
+			});
+			setAlertaAtivo(null);
+			setAnotacaoDespacho("");
+		} catch (e) {
+			console.error(e);
+		} finally {
+			setIsDespachando(false);
+		}
+	};
 
 	// Atualiza as distâncias e classifica risco continuamente
 	const medidasComDistancia = useMemo(() => {
@@ -163,7 +239,14 @@ export default function TacticalMonitorPage() {
 			let distancia = null;
 			let statusRisco = "DESCONHECIDO";
 
-			if (locAgressor && locVitima) {
+			if (
+				locAgressor &&
+				locVitima &&
+				locAgressor.lat !== null &&
+				locAgressor.lng !== null &&
+				locVitima.lat !== null &&
+				locVitima.lng !== null
+			) {
 				distancia = calcDist(
 					locAgressor.lat,
 					locAgressor.lng,
@@ -258,7 +341,12 @@ export default function TacticalMonitorPage() {
 
 	// GeoJSONs da Vítima e do Agressor para o Mapa Modal
 	const zonaExclusaoGeoJSON = useMemo(() => {
-		if (!medidaSelecionada?.locVitima) return null;
+		if (
+			!medidaSelecionada?.locVitima ||
+			medidaSelecionada.locVitima.lat === null ||
+			medidaSelecionada.locVitima.lng === null
+		)
+			return null;
 		return circle(
 			[medidaSelecionada.locVitima.lng, medidaSelecionada.locVitima.lat],
 			medidaSelecionada.raioProtecaoMetros,
@@ -268,6 +356,12 @@ export default function TacticalMonitorPage() {
 
 	const rastroAgressorGeoJSON = useMemo(() => {
 		if (!medidaSelecionada?.locAgressor) return null;
+		
+		// Respeita a privacidade: oculta o rastro a menos que esteja no override ou quebrando a regra
+		if (medidaSelecionada.locAgressor.isLocalizacaoOculta && !forceVisibility) {
+			return null;
+		}
+
 		const rastro =
 			historicoRastro[medidaSelecionada.agressor.dispositivoId] || [];
 		if (rastro.length < 2) return null; // Linha precisa de 2 pontos
@@ -280,6 +374,36 @@ export default function TacticalMonitorPage() {
 			},
 		};
 	}, [medidaSelecionada, historicoRastro]);
+
+	const zonasFixasGeoJSON = useMemo(() => {
+		if (!medidaSelecionada?.zonas || medidaSelecionada.zonas.length === 0)
+			return null;
+
+		const features = medidaSelecionada.zonas
+			.map((z: Zona) => {
+				try {
+					const coords = JSON.parse(z.coordenadas);
+					if (z.formato === "CIRCULO" && coords[0]) {
+						return circle([coords[0].lng, coords[0].lat], z.raioMetros || 100, {
+							steps: 64,
+							units: "meters",
+						});
+					}
+				} catch (e) {
+					console.error("Erro ao parsear coordenadas da zona", e);
+				}
+				return null;
+			})
+			// biome-ignore lint/suspicious/noExplicitAny: GeoJSON type needs to be inferred
+			.filter((f: any) => f !== null);
+
+		if (features.length === 0) return null;
+
+		return {
+			type: "FeatureCollection",
+			features: features,
+		};
+	}, [medidaSelecionada]);
 
 	return (
 		<div className="min-h-screen bg-slate-950 p-8 max-w-screen-2xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -315,6 +439,15 @@ export default function TacticalMonitorPage() {
 							).length
 						}
 					</Badge>
+					<button
+						type="button"
+						onClick={() => setForceVisibility(!forceVisibility)}
+						className={`py-2 px-4 text-sm shadow-sm rounded-md transition-colors flex items-center gap-2 ${forceVisibility ? "bg-red-600 hover:bg-red-700 text-white font-bold animate-pulse" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`}
+						title="Burlar Ocultação de Privacidade (Apenas para Testes)"
+					>
+						<Eye className="w-4 h-4" />
+						{forceVisibility ? "MODO TÁTICO ATIVADO" : "Forçar Visibilidade"}
+					</button>
 				</div>
 			</div>
 
@@ -396,9 +529,15 @@ export default function TacticalMonitorPage() {
 											<p
 												className={`text-2xl font-mono font-bold drop-shadow-md ${theme.text}`}
 											>
-												{m.distancia !== null
-													? `${Math.round(m.distancia)}m`
-													: "S/ Sinal"}
+												{m.locAgressor?.isLocalizacaoOculta && !forceVisibility ? (
+													<span className="text-sm font-semibold text-emerald-500 uppercase flex items-center gap-1">
+														<ShieldCheck className="w-4 h-4" /> Dentro da Lei
+													</span>
+												) : m.distancia !== null ? (
+													`${Math.round(m.distancia)}m`
+												) : (
+													"S/ Sinal"
+												)}
 											</p>
 										</div>
 										<div className="text-right flex flex-col justify-end h-full pb-1">
@@ -449,8 +588,8 @@ export default function TacticalMonitorPage() {
 								<p
 									className={`text-xl font-mono font-bold ${getStatusTheme(medidaSelecionada.statusRisco).text}`}
 								>
-									{medidaSelecionada.distancia !== null
-										? `${Math.round(medidaSelecionada.distancia)}m`
+									{medidaSelecionada.distancia != null
+										? `${Math.round(medidaSelecionada.distancia as number)}m`
 										: "S/ Sinal"}
 								</p>
 							</div>
@@ -471,18 +610,21 @@ export default function TacticalMonitorPage() {
 					{/* Corpo do Mapa */}
 					<div className="flex-1 relative bg-slate-900">
 						<MapComponent
-							mapboxAccessToken={
-								process.env.NEXT_PUBLIC_MAPBOX_TOKEN || _MAPBOX_TOKEN
-							}
 							initialViewState={{
 								longitude:
-									medidaSelecionada.locAgressor && medidaSelecionada.locVitima
+									medidaSelecionada.locAgressor &&
+									medidaSelecionada.locAgressor.lng !== null &&
+									medidaSelecionada.locVitima &&
+									medidaSelecionada.locVitima.lng !== null
 										? (medidaSelecionada.locAgressor.lng +
 												medidaSelecionada.locVitima.lng) /
 											2
 										: medidaSelecionada.locAgressor?.lng || -51.23,
 								latitude:
-									medidaSelecionada.locAgressor && medidaSelecionada.locVitima
+									medidaSelecionada.locAgressor &&
+									medidaSelecionada.locAgressor.lat !== null &&
+									medidaSelecionada.locVitima &&
+									medidaSelecionada.locVitima.lat !== null
 										? (medidaSelecionada.locAgressor.lat +
 												medidaSelecionada.locVitima.lat) /
 											2
@@ -490,27 +632,54 @@ export default function TacticalMonitorPage() {
 								zoom: 14.5,
 							}}
 							style={{ width: "100%", height: "100%" }}
-							mapStyle="mapbox://styles/mapbox/dark-v11"
+							// biome-ignore lint/suspicious/noExplicitAny: MAPLIBRE Style Format
+							mapStyle={MAPLIBRE_STYLE as any}
 						>
-							{/* Renderiza Zona de Exclusão e Rastro Histórico */}
+							{/* Renderiza Zona de Exclusão Móvel (Vítima) e Rastro Histórico */}
 							{zonaExclusaoGeoJSON && (
 								<Source
-									id="zona-source"
+									id="zona-movel-source"
 									type="geojson"
+									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
 									data={zonaExclusaoGeoJSON as any}
 								>
 									<Layer
-										id="zona-fill"
+										id="zona-movel-fill"
+										type="fill"
+										paint={{ "fill-color": "#3b82f6", "fill-opacity": 0.1 }}
+									/>
+									<Layer
+										id="zona-movel-line"
+										type="line"
+										paint={{
+											"line-color": "#3b82f6",
+											"line-width": 2,
+											"line-opacity": 0.6,
+										}}
+									/>
+								</Source>
+							)}
+
+							{/* Renderiza Zonas de Exclusão Fixas */}
+							{zonasFixasGeoJSON && (
+								<Source
+									id="zonas-fixas-source"
+									type="geojson"
+									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
+									data={zonasFixasGeoJSON as any}
+								>
+									<Layer
+										id="zonas-fixas-fill"
 										type="fill"
 										paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
 									/>
 									<Layer
-										id="zona-line"
+										id="zonas-fixas-line"
 										type="line"
 										paint={{
 											"line-color": "#ef4444",
 											"line-width": 2,
-											"line-opacity": 0.5,
+											"line-dasharray": [2, 2],
 										}}
 									/>
 								</Source>
@@ -520,6 +689,7 @@ export default function TacticalMonitorPage() {
 								<Source
 									id="rastro-source"
 									type="geojson"
+									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
 									data={rastroAgressorGeoJSON as any}
 								>
 									<Layer
@@ -536,51 +706,54 @@ export default function TacticalMonitorPage() {
 							)}
 
 							{/* Renderiza todos os pontos no mapa para contexto geral */}
-							{pontos.map((ponto) => {
-								const isVitima = ponto.tipoDispositivo === "DAV";
-								// Destaca os pinos que fazem parte dessa medida específica
-								const isEnvolvido =
-									ponto.dispositivoId ===
-										medidaSelecionada.agressor.dispositivoId ||
-									ponto.dispositivoId ===
-										medidaSelecionada.vitima.dispositivoId;
+							{pontos
+								.filter((p) => p.lat !== null && p.lng !== null)
+								.filter((p) => forceVisibility || !p.isLocalizacaoOculta)
+								.map((ponto) => {
+									const isVitima = ponto.tipoDispositivo === "DAV";
+									// Destaca os pinos que fazem parte dessa medida específica
+									const isEnvolvido =
+										ponto.dispositivoId ===
+											medidaSelecionada.agressor.dispositivoId ||
+										ponto.dispositivoId ===
+											medidaSelecionada.vitima.dispositivoId;
 
-								return (
-									<Marker
-										key={ponto.dispositivoId}
-										longitude={ponto.lng}
-										latitude={ponto.lat}
-										anchor="bottom"
-									>
-										<div
-											className={`relative flex items-center justify-center cursor-pointer group ${isEnvolvido ? "scale-125 z-50" : "opacity-40 hover:opacity-100 z-10"}`}
+									return (
+										<Marker
+											key={ponto.dispositivoId}
+											longitude={ponto.lng as number}
+											latitude={ponto.lat as number}
+											anchor="bottom"
 										>
-											{isVitima && isEnvolvido && (
-												<div className="absolute w-12 h-12 bg-blue-500/30 rounded-full animate-ping" />
-											)}
-											{!isVitima &&
-												isEnvolvido &&
-												medidaSelecionada.statusRisco === "CRITICO" && (
-													<div className="absolute w-12 h-12 bg-red-500/30 rounded-full animate-ping" />
+											<div
+												className={`relative flex items-center justify-center cursor-pointer group ${isEnvolvido ? "scale-125 z-50" : "opacity-40 hover:opacity-100 z-10"}`}
+											>
+												{isVitima && isEnvolvido && (
+													<div className="absolute w-12 h-12 bg-blue-500/30 rounded-full animate-ping" />
 												)}
-											<MapPin
-												className={`drop-shadow-2xl transition-transform ${
-													isEnvolvido ? "w-10 h-10" : "w-6 h-6"
-												} ${
-													isVitima
-														? "text-blue-500 fill-blue-500/20"
-														: "text-red-500 fill-red-500/20"
-												}`}
-											/>
-											{isEnvolvido && (
-												<div className="absolute top-10 bg-slate-900 border border-slate-700 text-white text-xs px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap font-semibold tracking-wider uppercase">
-													{ponto.monitorado?.nome || "Desconhecido"}
-												</div>
-											)}
-										</div>
-									</Marker>
-								);
-							})}
+												{!isVitima &&
+													isEnvolvido &&
+													medidaSelecionada.statusRisco === "CRITICO" && (
+														<div className="absolute w-12 h-12 bg-red-500/30 rounded-full animate-ping" />
+													)}
+												<MapPin
+													className={`drop-shadow-2xl transition-transform ${
+														isEnvolvido ? "w-10 h-10" : "w-6 h-6"
+													} ${
+														isVitima
+															? "text-blue-500 fill-blue-500/20"
+															: "text-red-500 fill-red-500/20"
+													}`}
+												/>
+												{isEnvolvido && (
+													<div className="absolute top-10 bg-slate-900 border border-slate-700 text-white text-xs px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap font-semibold tracking-wider uppercase">
+														{ponto.monitorado?.nome || "Desconhecido"}
+													</div>
+												)}
+											</div>
+										</Marker>
+									);
+								})}
 						</MapComponent>
 
 						{/* HUD Sobreposto no Mapa (Targeting Reticle Style) */}
@@ -613,7 +786,7 @@ export default function TacticalMonitorPage() {
 									: "BATERIA EM NÍVEL CRÍTICO"}
 						</p>
 
-						<div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3">
+						<div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 mb-6">
 							<div className="flex justify-between items-center border-b border-slate-800/50 pb-3">
 								<span className="text-slate-400 font-semibold tracking-wider uppercase text-xs">
 									Tipo do Evento
@@ -642,13 +815,33 @@ export default function TacticalMonitorPage() {
 							)}
 						</div>
 
+						<div className="w-full space-y-2 mb-8">
+							<label
+								htmlFor="despacho"
+								className="text-sm font-semibold text-slate-300 uppercase tracking-widest"
+							>
+								Ação do Operador (Despacho)
+							</label>
+							<textarea
+								id="despacho"
+								placeholder="Ex: Viatura 45 enviada para o local. Agressor interceptado..."
+								className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+								rows={3}
+								value={anotacaoDespacho}
+								onChange={(e) => setAnotacaoDespacho(e.target.value)}
+							/>
+						</div>
+
 						<button
 							type="button"
-							onClick={() => setAlertaAtivo(null)}
-							className="mt-8 w-full bg-red-600 hover:bg-red-500 text-white font-black text-lg py-5 rounded-xl uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)]"
+							disabled={isDespachando}
+							onClick={handleDespacharViatura}
+							className="w-full bg-red-600 hover:bg-red-500 text-white font-black text-lg py-5 rounded-xl uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:shadow-[0_0_50px_rgba(220,38,38,0.6)] disabled:opacity-50"
 						>
 							<ShieldAlert className="w-6 h-6" />
-							Reconhecer e Intervir
+							{isDespachando
+								? "Despachando..."
+								: "Registrar Intervenção Tática"}
 						</button>
 					</div>
 				</div>
