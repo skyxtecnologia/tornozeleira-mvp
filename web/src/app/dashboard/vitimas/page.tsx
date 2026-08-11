@@ -74,7 +74,7 @@ export default async function VitimasPage() {
 											<div className="flex flex-col">
 												<span>{vitima.cpf}</span>
 												<span className="text-xs text-muted-foreground">
-													{vitima.contato || "Sem contato"}
+													{vitima.telefone || "Sem contato"}
 												</span>
 											</div>
 										</TableCell>

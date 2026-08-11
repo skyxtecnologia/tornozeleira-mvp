@@ -69,6 +69,9 @@ export default async function AgressoresPage() {
 								<TableRow key={agressor.id}>
 									<TableCell className="font-medium">{agressor.nome}</TableCell>
 									<TableCell>{agressor.cpf}</TableCell>
+									<TableCell className="font-mono text-xs">
+										{agressor.telefone || "Não informado"}
+									</TableCell>
 									<TableCell>
 										{agressor.dispositivo ? (
 											<div className="flex flex-col">

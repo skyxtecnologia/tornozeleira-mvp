@@ -6,8 +6,15 @@ const prisma = new PrismaClient();
 export async function POST(request: Request) {
 	try {
 		const body = await request.json();
-		const { numeroProcesso, agressorId, vitimaId, raioProtecaoMetros, juizo } =
-			body;
+		const {
+			numeroProcesso,
+			agressorId,
+			vitimaId,
+			raioProtecaoMetros,
+			juizo,
+			varaCriminal,
+			observacoes,
+		} = body;
 
 		if (!numeroProcesso || !agressorId || !vitimaId || !raioProtecaoMetros) {
 			return NextResponse.json(
@@ -23,6 +30,8 @@ export async function POST(request: Request) {
 				vitimaId,
 				raioProtecaoMetros: Number.parseInt(raioProtecaoMetros, 10),
 				juizo: juizo || null,
+				varaCriminal: varaCriminal || null,
+				observacoes: observacoes || null,
 				status: "ATIVA",
 				dataInicio: new Date(),
 			},

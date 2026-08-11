@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: Request) {
 	try {
 		const body = await request.json();
-		const { nome, cpf, tipo, dispositivoId } = body;
+		const { nome, cpf, tipo, dispositivoId, telefone, endereco } = body;
 
 		if (!nome || !cpf || !tipo) {
 			return NextResponse.json(
@@ -39,6 +39,8 @@ export async function POST(request: Request) {
 				nome,
 				cpf,
 				tipo,
+				telefone,
+				endereco,
 				dispositivoId: dispositivoId || null,
 			},
 		});

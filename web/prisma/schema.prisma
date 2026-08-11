@@ -30,6 +30,8 @@ model Monitorado {
   cpf            String         @unique
   rg             String?
   dataNascimento DateTime?
+  telefone       String?
+  endereco       String?
   tipo           String         // AGRESSOR, VITIMA
 
   dispositivoId  String?        @unique
@@ -48,6 +50,8 @@ model MedidaProtetiva {
   id             String       @id @default(uuid())
   numeroProcesso String       @unique
   juizo          String?
+  varaCriminal   String?
+  observacoes    String?
   
   agressorId     String
   agressor       Monitorado   @relation("agressorMedida", fields: [agressorId], references: [id])
@@ -117,4 +121,14 @@ model Telemetria {
   timestamp     DateTime    @default(now())
 
   @@index([dispositivoId, timestamp])
+}
+
+model Usuario {
+  id           String   @id @default(uuid())
+  nome         String
+  email        String   @unique
+  senhaHash    String
+  role         String   @default("OPERADOR") // ADMIN, OPERADOR
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }

@@ -22,6 +22,7 @@ export async function GET() {
 						dispositivoId: true,
 					},
 				},
+				zonas: true,
 			},
 		});
 

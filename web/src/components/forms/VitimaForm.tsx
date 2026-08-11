@@ -25,6 +25,8 @@ export function VitimaForm() {
 		const data = {
 			nome: formData.get("nome"),
 			cpf: formData.get("cpf"),
+			telefone: formData.get("telefone"),
+			endereco: formData.get("endereco"),
 			tipo: "VITIMA",
 		};
 
@@ -75,6 +77,26 @@ export function VitimaForm() {
 							className="bg-slate-950 border-slate-800"
 							placeholder="000.000.000-00"
 						/>
+					</div>
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<Label htmlFor="telefone">Telefone (Opcional)</Label>
+							<Input
+								id="telefone"
+								name="telefone"
+								className="bg-slate-950 border-slate-800"
+								placeholder="(22) 99999-9999"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="endereco">Endereço Principal (Opcional)</Label>
+							<Input
+								id="endereco"
+								name="endereco"
+								className="bg-slate-950 border-slate-800"
+								placeholder="Rua das Flores, 123"
+							/>
+						</div>
 					</div>
 					<Button
 						type="submit"

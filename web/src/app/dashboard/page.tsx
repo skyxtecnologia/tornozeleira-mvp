@@ -2,12 +2,12 @@ import { PrismaClient } from "@prisma/client";
 import {
 	Activity,
 	BatteryWarning,
-	MapPin,
 	ShieldAlert,
 	Siren,
 	Users,
 } from "lucide-react";
 import Link from "next/link";
+import { StatusDispositivos } from "@/components/dashboard/StatusDispositivos";
 import { Badge } from "@/components/ui/badge";
 import {
 	Card,
@@ -28,12 +28,14 @@ export default async function DashboardHomePage() {
 		totalVitimas,
 		totalDispositivosAtivos,
 		totalAlertas,
+		totalMedidasAtivas,
 		ultimosAlertas,
 	] = await Promise.all([
 		prisma.monitorado.count({ where: { tipo: "AGRESSOR" } }),
 		prisma.monitorado.count({ where: { tipo: "VITIMA" } }),
 		prisma.dispositivo.count({ where: { status: "ATIVO" } }),
 		prisma.alerta.count(),
+		prisma.medidaProtetiva.count({ where: { status: "ATIVA" } }),
 		prisma.alerta.findMany({
 			take: 5,
 			orderBy: { timestamp: "desc" },
@@ -68,7 +70,7 @@ export default async function DashboardHomePage() {
 			</div>
 
 			{/* Cards de KPIs */}
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
 				<Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 shadow-sm hover:border-red-900/50 transition-colors relative overflow-hidden group">
 					<div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-red-500/10 transition-colors" />
 					<CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -119,6 +121,24 @@ export default async function DashboardHomePage() {
 					</CardContent>
 				</Card>
 
+				<Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 shadow-sm hover:border-emerald-900/50 transition-colors relative overflow-hidden group">
+					<div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-emerald-500/10 transition-colors" />
+					<CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+						<CardTitle className="text-sm font-medium text-slate-300">
+							Medidas Ativas
+						</CardTitle>
+						<ShieldAlert className="w-4 h-4 text-emerald-400" />
+					</CardHeader>
+					<CardContent>
+						<div className="text-2xl font-bold text-slate-100">
+							{totalMedidasAtivas}
+						</div>
+						<p className="text-xs text-slate-500 mt-1">
+							Zonas de exclusão monitoradas
+						</p>
+					</CardContent>
+				</Card>
+
 				<Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 shadow-sm hover:border-orange-900/50 transition-colors relative overflow-hidden group">
 					<div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-orange-500/10 transition-colors" />
 					<CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -137,28 +157,28 @@ export default async function DashboardHomePage() {
 			</div>
 
 			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-				{/* Seção Principal (Mapa Rápido / Status) */}
-				<Card className="col-span-4 bg-gradient-to-br from-indigo-950/40 via-slate-950 to-slate-900 border-slate-800 flex flex-col justify-center items-center p-10 text-center relative overflow-hidden shadow-2xl">
-					{/* Animações de fundo decorativas */}
-					<div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
-					<div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
-					
-					<div className="w-24 h-24 bg-slate-900/80 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 ring-1 ring-slate-700/50 shadow-2xl relative z-10">
-						<MapPin className="w-10 h-10 text-emerald-500" />
-					</div>
-					<h3 className="text-xl font-bold text-slate-100">
-						Sistema Operacional
-					</h3>
-					<p className="text-slate-400 max-w-sm mt-2 mb-6 text-sm">
-						Os serviços de telemetria e recepção georreferenciada estão ativos e
-						rodando sem gargalos.
-					</p>
-					<Link
-						href="/dashboard/map"
-						className="relative z-10 inline-flex items-center justify-center rounded-lg text-sm font-bold tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] h-12 px-8 uppercase"
-					>
-						Abrir Central de Mapa
-					</Link>
+				{/* Seção Principal (Saúde dos Dispositivos / Hardware) */}
+				<Card className="col-span-4 bg-slate-900 border-slate-800 shadow-xl">
+					<CardHeader className="border-b border-slate-800/50 pb-4 flex flex-row items-center justify-between">
+						<div>
+							<CardTitle className="text-lg text-slate-200">
+								Saúde Operacional (Hardware)
+							</CardTitle>
+							<CardDescription>
+								Monitoramento de nível de bateria e conectividade dos aparelhos
+								em campo.
+							</CardDescription>
+						</div>
+						<Link
+							href="/dashboard/map"
+							className="inline-flex items-center justify-center rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] h-9 px-4 uppercase"
+						>
+							Abrir Mapa Tático
+						</Link>
+					</CardHeader>
+					<CardContent className="pt-6">
+						<StatusDispositivos />
+					</CardContent>
 				</Card>
 
 				{/* Últimas Ocorrências */}
@@ -179,7 +199,10 @@ export default async function DashboardHomePage() {
 								</p>
 							) : (
 								ultimosAlertas.map((alerta) => (
-									<div key={alerta.id} className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700/50 group">
+									<div
+										key={alerta.id}
+										className="flex items-center p-3 rounded-lg hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-700/50 group"
+									>
 										<div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg group-hover:border-slate-700 transition-colors shadow-sm">
 											{getAlertaIcon(alerta.tipo)}
 										</div>

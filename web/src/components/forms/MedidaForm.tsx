@@ -48,6 +48,9 @@ export function MedidaForm() {
 			agressorId: formData.get("agressorId"),
 			vitimaId: formData.get("vitimaId"),
 			raioProtecaoMetros: formData.get("raioProtecaoMetros"),
+			juizo: formData.get("juizo"),
+			varaCriminal: formData.get("varaCriminal"),
+			observacoes: formData.get("observacoes"),
 		};
 
 		try {
@@ -86,6 +89,36 @@ export function MedidaForm() {
 							required
 							className="bg-slate-950 border-slate-800"
 							placeholder="0001234-56.2026.8.21.0001"
+						/>
+					</div>
+
+					<div className="grid grid-cols-2 gap-4">
+						<div className="space-y-2">
+							<Label htmlFor="juizo">Juízo Responsável (Opcional)</Label>
+							<Input
+								id="juizo"
+								name="juizo"
+								className="bg-slate-950 border-slate-800"
+								placeholder="Ex: 1º Juizado de Violência Doméstica"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="varaCriminal">Vara Criminal (Opcional)</Label>
+							<Input
+								id="varaCriminal"
+								name="varaCriminal"
+								className="bg-slate-950 border-slate-800"
+								placeholder="Ex: 3ª Vara Criminal"
+							/>
+						</div>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="observacoes">Observações (Opcional)</Label>
+						<Input
+							id="observacoes"
+							name="observacoes"
+							className="bg-slate-950 border-slate-800"
+							placeholder="Condições especiais da Medida Protetiva"
 						/>
 					</div>
 

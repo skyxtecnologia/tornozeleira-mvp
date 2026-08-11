@@ -4,11 +4,13 @@ import {
 	Link as LinkIcon,
 	LocateFixed,
 	ShieldAlert,
+	ShieldCheck,
 	Users,
 } from "lucide-react";
 import { AgressorForm } from "@/components/forms/AgressorForm";
 import { DispositivoForm } from "@/components/forms/DispositivoForm";
 import { MedidaForm } from "@/components/forms/MedidaForm";
+import { OperadorForm } from "@/components/forms/OperadorForm";
 import { VitimaForm } from "@/components/forms/VitimaForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -26,7 +28,14 @@ export default function CadastrosPage() {
 			</div>
 
 			<Tabs defaultValue="vitimas" className="w-full max-w-4xl mx-auto">
-				<TabsList className="grid w-full grid-cols-4 bg-slate-900 border border-slate-800">
+				<TabsList className="grid w-full grid-cols-5 bg-slate-900 border border-slate-800">
+					<TabsTrigger
+						value="operadores"
+						className="text-slate-400 hover:text-slate-100 data-[state=active]:bg-slate-800 data-[state=active]:text-indigo-400"
+					>
+						<ShieldCheck className="w-4 h-4 mr-2" />
+						Operadores
+					</TabsTrigger>
 					<TabsTrigger
 						value="vitimas"
 						className="text-slate-400 hover:text-slate-100 data-[state=active]:bg-slate-800 data-[state=active]:text-indigo-400"
@@ -58,6 +67,9 @@ export default function CadastrosPage() {
 				</TabsList>
 
 				<div className="mt-6">
+					<TabsContent value="operadores">
+						<OperadorForm />
+					</TabsContent>
 					<TabsContent value="vitimas">
 						<VitimaForm />
 					</TabsContent>
