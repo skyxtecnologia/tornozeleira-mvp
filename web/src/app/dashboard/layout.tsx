@@ -11,7 +11,7 @@ import {
 	Users,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,6 +22,12 @@ export default function DashboardLayout({
 }) {
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const pathname = usePathname();
+	const router = useRouter();
+
+	const handleLogout = async () => {
+		await fetch("/api/auth/logout", { method: "POST" });
+		router.push("/login");
+	};
 
 	return (
 		<div className="flex h-screen bg-slate-950 text-slate-50 overflow-hidden">
@@ -35,10 +41,27 @@ export default function DashboardLayout({
 					<div className="h-16 flex items-center justify-between border-b border-slate-800 relative px-4">
 						{!isCollapsed && (
 							<div className="flex items-center w-full justify-start">
-								<ShieldAlert className="h-6 w-6 text-red-500 shrink-0" />
-								<span className="ml-3 font-semibold tracking-wide text-sm uppercase whitespace-nowrap">
-									SME Central
-								</span>
+								<img
+									src="/logo-guarda.png"
+									alt="Logo Guarda"
+									className="h-10 shrink-0 object-contain drop-shadow-md"
+									onError={(e) => {
+										e.currentTarget.style.display = "none";
+										const parent = e.currentTarget.parentElement;
+										if (parent) {
+											parent.innerHTML =
+												'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-500"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>';
+										}
+									}}
+								/>
+								<div className="ml-3 flex flex-col">
+									<span className="font-bold tracking-wide text-[10px] uppercase whitespace-nowrap text-indigo-400">
+										Guarda Municipal
+									</span>
+									<span className="font-black tracking-widest text-xs uppercase whitespace-nowrap">
+										SME Macaé
+									</span>
+								</div>
 							</div>
 						)}
 						<button
@@ -63,6 +86,13 @@ export default function DashboardLayout({
 							icon={<MapIcon className="h-5 w-5 shrink-0" />}
 							label="Monitoramento"
 							active={pathname === "/dashboard/map"}
+							isCollapsed={isCollapsed}
+						/>
+						<NavItem
+							href="/dashboard/medidas"
+							icon={<ShieldAlert className="h-5 w-5 shrink-0" />}
+							label="Medidas Protetivas"
+							active={pathname === "/dashboard/medidas"}
 							isCollapsed={isCollapsed}
 						/>
 						<NavItem
@@ -100,12 +130,21 @@ export default function DashboardLayout({
 						label="Configurações"
 						isCollapsed={isCollapsed}
 					/>
-					<NavItem
-						href="/logout"
-						icon={<LogOut className="h-5 w-5 text-slate-400 shrink-0" />}
-						label="Sair"
-						isCollapsed={isCollapsed}
-					/>
+					<button
+						type="button"
+						onClick={handleLogout}
+						className={`w-full flex items-center p-3 rounded-md transition-colors text-slate-400 hover:bg-slate-800/50 hover:text-red-400 ${
+							isCollapsed ? "justify-center" : "justify-start gap-3"
+						}`}
+						title={isCollapsed ? "Sair" : undefined}
+					>
+						<LogOut className="h-5 w-5 shrink-0" />
+						{!isCollapsed && (
+							<span className="text-sm font-medium whitespace-nowrap">
+								Sair do Sistema
+							</span>
+						)}
+					</button>
 				</div>
 			</aside>
 
