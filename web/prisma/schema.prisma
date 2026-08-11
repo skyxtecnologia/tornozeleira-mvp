@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Dispositivo {
+  id           String            @id @default(uuid())
+  imei         String            @unique
+  serial       String            @unique
+  tipo         String            // TORNOZELEIRA, DAV
+  status       String            @default("ESTOQUE") // ESTOQUE, ATIVO, MANUTENCAO, INATIVO
+  bateriaAtual Int               @default(100) // porcentagem
+  telefone     String?           // Para o SIM card principal
+
+  monitorado   Monitorado?
+
+  telemetrias  Telemetria[]
+  
+  criadoEm     DateTime          @default(now())
+  atualizadoEm DateTime          @updatedAt
+}
+
+model Monitorado {
+  id             String         @id @default(uuid())
+  nome           String
+  cpf            String         @unique
+  rg             String?
+  dataNascimento DateTime?
+  tipo           String         // AGRESSOR, VITIMA
+
+  dispositivoId  String?        @unique
+  dispositivo    Dispositivo?   @relation(fields: [dispositivoId], references: [id])
+
+  medidasComoAgressor MedidaProtetiva[] @relation("agressorMedida")
+  medidasComoVitima   MedidaProtetiva[] @relation("vitimaMedida")
+  
+  alertas       Alerta[]
+
+  criadoEm     DateTime       @default(now())
+  atualizadoEm DateTime       @updatedAt
+}
+
+model MedidaProtetiva {
+  id             String       @id @default(uuid())
+  numeroProcesso String       @unique
+  juizo          String?
+  
+  agressorId     String
+  agressor       Monitorado   @relation("agressorMedida", fields: [agressorId], references: [id])
+  
+  vitimaId       String
+  vitima         Monitorado   @relation("vitimaMedida", fields: [vitimaId], references: [id])
+
+  raioProtecaoMetros Int      @default(1000) // Distância mínima que o agressor deve ficar da vítima
+
+  status         String       @default("ATIVA") // ATIVA, REVOGADA, EXPIRADA
+  dataInicio     DateTime
+  dataFim        DateTime?
+
+  zonas          Zona[]
+
+  criadoEm       DateTime     @default(now())
+  atualizadoEm   DateTime     @updatedAt
+}
+
+model Zona {
+  id                String          @id @default(uuid())
+  medidaProtetivaId String
+  medidaProtetiva   MedidaProtetiva @relation(fields: [medidaProtetivaId], references: [id])
+
+  tipo              String          // INCLUSAO, EXCLUSAO
+  formato           String          // CIRCULO, POLIGONO
+  
+  // No PostgreSQL real, usaríamos PostGIS.
+  coordenadas       String          // Array de lat/lng JSON stringified
+  raioMetros        Int?            // Se for CIRCULO
+  
+  horaInicio        String?         // Ex: "18:00"
+  horaFim           String?         // Ex: "06:00"
+
+  ativa             Boolean         @default(true)
+  criadoEm          DateTime        @default(now())
+}
+
+model Alerta {
+  id             String      @id @default(uuid())
+  monitoradoId   String
+  monitorado     Monitorado  @relation(fields: [monitoradoId], references: [id])
+  
+  tipo           String      // BATERIA_BAIXA, VIOLACAO_ZONA, APROXIMACAO_VITIMA, BOTAO_PANICO, PERDA_SINAL
+  nivel          String      // CRITICO, ALTO, MEDIO, BAIXO
+  
+  reconhecido    Boolean     @default(false)
+  reconhecidoPor String?     // ID do Operador (mock)
+  anotacaoOperador String?
+
+  timestamp      DateTime    @default(now())
+}
+
+model Telemetria {
+  id            String      @id @default(uuid())
+  dispositivoId String
+  dispositivo   Dispositivo @relation(fields: [dispositivoId], references: [id])
+
+  lat           Float
+  lng           Float
+  velocidadeKmh Float?
+  bateria       Int
+
+  // Modo offline (sync burst)
+  isOffline     Boolean     @default(false)
+
+  timestamp     DateTime    @default(now())
+
+  @@index([dispositivoId, timestamp])
+}
