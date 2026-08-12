@@ -1,29 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { systemEmitter } from "@/lib/eventEmitter";
+import { GeofenceService } from "@/services/GeofenceService";
 
 const prisma = new PrismaClient();
-
-// Haversine formula para calcular a distância em metros entre duas coordenadas
-function calculateDistanceMeters(
-	lat1: number,
-	lon1: number,
-	lat2: number,
-	lon2: number,
-) {
-	const R = 6371e3; // Raio da Terra em metros
-	const φ1 = (lat1 * Math.PI) / 180;
-	const φ2 = (lat2 * Math.PI) / 180;
-	const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-	const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-	const a =
-		Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-		Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-	return R * c;
-}
 
 export async function POST(request: Request) {
 	try {
@@ -91,80 +71,11 @@ export async function POST(request: Request) {
 			monitorado.tipo === "AGRESSOR" &&
 			monitorado.medidasComoAgressor.length > 0
 		) {
-			for (const medida of monitorado.medidasComoAgressor) {
-				if (medida.status !== "ATIVA") continue;
-
-				// 4.1 Checa aproximação da vítima (Raio dinâmico)
-				const vitima = await prisma.monitorado.findUnique({
-					where: { id: medida.vitimaId },
-					include: {
-						dispositivo: {
-							include: {
-								telemetrias: { orderBy: { timestamp: "desc" }, take: 1 },
-							},
-						},
-					},
-				});
-
-				const ultimaPosicaoVitima = vitima?.dispositivo?.telemetrias[0];
-				if (ultimaPosicaoVitima) {
-					const dist = calculateDistanceMeters(
-						telemetria.lat,
-						telemetria.lng,
-						ultimaPosicaoVitima.lat,
-						ultimaPosicaoVitima.lng,
-					);
-
-					if (dist <= medida.raioProtecaoMetros) {
-						isViolating = true;
-						const alertaAproximacao = await prisma.alerta.create({
-							data: {
-								monitoradoId: monitorado.id,
-								tipo: "APROXIMACAO_VITIMA",
-								nivel: "CRITICO",
-								anotacaoOperador: `Distância: ${Math.round(dist)}m. Limite: ${medida.raioProtecaoMetros}m`,
-							},
-						});
-						systemEmitter.emit("novo_alerta", alertaAproximacao);
-					}
-				}
-
-				// 4.2 Checa Zonas Estáticas (Exclusão)
-				const zonas = await prisma.zona.findMany({
-					where: {
-						medidaProtetivaId: medida.id,
-						ativa: true,
-						tipo: "EXCLUSAO",
-					},
-				});
-
-				for (const zona of zonas) {
-					if (zona.formato === "CIRCULO" && zona.raioMetros) {
-						const coords = JSON.parse(zona.coordenadas);
-						const centro = coords[0];
-						if (centro) {
-							const distZona = calculateDistanceMeters(
-								telemetria.lat,
-								telemetria.lng,
-								centro.lat,
-								centro.lng,
-							);
-							if (distZona <= zona.raioMetros) {
-								isViolating = true;
-								const alertaZona = await prisma.alerta.create({
-									data: {
-										monitoradoId: monitorado.id,
-										tipo: "VIOLACAO_ZONA",
-										nivel: "ALTO",
-										anotacaoOperador: `Invasão de zona. Distância ao centro: ${Math.round(distZona)}m`,
-									},
-								});
-								systemEmitter.emit("novo_alerta", alertaZona);
-							}
-						}
-					}
-				}
-			}
+			isViolating = await GeofenceService.processViolations(
+				{ lat: telemetria.lat, lng: telemetria.lng },
+				monitorado.id,
+				monitorado.medidasComoAgressor
+			);
 		}
 
 		// 5. Aplicar Lei de Privacidade

@@ -5,15 +5,22 @@ import MapComponent, { Layer, Marker, Source } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
 import circle from "@turf/circle";
 import {
-	AlertTriangle,
-	Crosshair,
-	Eye,
-	MapPin,
+	Activity,
+	WifiOff,
 	ShieldAlert,
+	Crosshair,
+	Users,
 	ShieldCheck,
+	Eye,
 	X,
+	MapPin,
+	AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { systemEmitter } from "@/lib/eventEmitter";
+import { AlertModal } from "@/components/map/AlertModal";
+import { StatusCards } from "@/components/map/StatusCards";
+import { SidebarList } from "@/components/map/SidebarList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Estilo 100% gratuito e open-source usando OpenStreetMap Raster Tiles
@@ -79,6 +86,13 @@ interface MedidaAtiva {
 	zonas: Zona[];
 }
 
+export interface MedidaProcessada extends MedidaAtiva {
+	locAgressor?: Localizacao;
+	locVitima?: Localizacao;
+	distancia?: number | null;
+	statusRisco: string;
+}
+
 function calcDist(lat1: number, lon1: number, lat2: number, lon2: number) {
 	const R = 6371e3;
 	const φ1 = (lat1 * Math.PI) / 180;
@@ -100,13 +114,6 @@ export default function TacticalMonitorPage() {
 	const [historicoRastro, setHistoricoRastro] = useState<
 		Record<string, { lng: number; lat: number }[]>
 	>({});
-
-	interface MedidaProcessada extends MedidaAtiva {
-		locAgressor?: Localizacao;
-		locVitima?: Localizacao;
-		distancia?: number | null;
-		statusRisco: string;
-	}
 
 	// Estado do Mapa Modal
 	const [medidaSelecionada, setMedidaSelecionada] =
@@ -407,207 +414,34 @@ export default function TacticalMonitorPage() {
 
 	return (
 		<div className="min-h-screen bg-slate-950 p-8 max-w-screen-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-			{/* Cabeçalho da Tela Base */}
-			<div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
-				<div>
-					<h1 className="text-3xl font-bold tracking-tight text-slate-50 flex items-center gap-3">
-						<Crosshair className="w-8 h-8 text-indigo-500" />
-						Monitoramento Tático
-					</h1>
-					<p className="text-muted-foreground mt-2 max-w-2xl">
-						Visão operacional de todas as Medidas Protetivas rastreadas no
-						perímetro. Os alertas são classificados pela gravidade da
-						aproximação.
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Badge
-						variant="outline"
-						className="bg-slate-900 border-slate-800 text-slate-300 py-2 px-4 text-sm shadow-sm"
-					>
-						Dispositivos Online: {pontos.length}
-					</Badge>
-					<Badge
-						variant="default"
-						className="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 text-sm shadow-[0_0_15px_rgba(79,70,229,0.3)]"
-					>
-						Medidas em Risco:{" "}
-						{
-							medidasComDistancia.filter(
-								(m) =>
-									m.statusRisco === "CRITICO" || m.statusRisco === "PERIGO",
-							).length
-						}
-					</Badge>
-					<button
-						type="button"
-						onClick={() => setForceVisibility(!forceVisibility)}
-						className={`py-2 px-4 text-sm shadow-sm rounded-md transition-colors flex items-center gap-2 ${forceVisibility ? "bg-red-600 hover:bg-red-700 text-white font-bold animate-pulse" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`}
-						title="Burlar Ocultação de Privacidade (Apenas para Testes)"
-					>
-						<Eye className="w-4 h-4" />
-						{forceVisibility ? "MODO TÁTICO ATIVADO" : "Forçar Visibilidade"}
-					</button>
-				</div>
+			{/* Container Absoluto sobre o Mapa para Cards de Status (Superior) */}
+			<div className="absolute top-4 left-4 right-4 md:right-auto z-10">
+				<StatusCards
+					medidasComDistancia={medidasComDistancia}
+					forceVisibility={forceVisibility}
+					setForceVisibility={setForceVisibility}
+				/>
 			</div>
 
-			{/* Grid de Cards de KPIs */}
-			<div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-				{medidasComDistancia.length === 0 ? (
-					<div className="col-span-full py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-xl">
-						<ShieldCheck className="w-12 h-12 text-slate-700 mb-4" />
-						<p className="text-slate-500 text-lg">
-							Nenhuma medida ativa sendo rastreada no momento.
-						</p>
-					</div>
-				) : (
-					medidasComDistancia.map((m) => {
-						const theme = getStatusTheme(m.statusRisco);
-
-						return (
-							<Card
-								key={m.id}
-								onClick={() => setMedidaSelecionada(m)}
-								className={`bg-gradient-to-br ${theme.gradient} border ${theme.border} shadow-lg hover:scale-[1.02] hover:shadow-2xl transition-all duration-300 relative overflow-hidden group cursor-pointer`}
-							>
-								{/* Efeito glow de fundo no card */}
-								<div
-									className={`absolute top-0 right-0 w-32 h-32 ${theme.glow}/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:${theme.glow}/20 transition-colors`}
-								/>
-
-								<CardHeader className="flex flex-row items-center justify-between pb-2 relative z-10">
-									<div className="flex items-center gap-2">
-										{theme.icon}
-										<CardTitle
-											className={`text-sm font-bold uppercase tracking-widest ${theme.text}`}
-										>
-											{m.statusRisco}
-										</CardTitle>
-									</div>
-									{m.statusRisco === "CRITICO" && (
-										<span className="relative flex h-3 w-3">
-											<span
-												className={`animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75`}
-											></span>
-											<span
-												className={`relative inline-flex rounded-full h-3 w-3 bg-red-500`}
-											></span>
-										</span>
-									)}
-								</CardHeader>
-								<CardContent className="relative z-10 pt-4">
-									<div className="grid grid-cols-2 gap-4 mb-4">
-										<div>
-											<p className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-												Agressor
-											</p>
-											<p
-												className="text-sm font-medium text-slate-100 truncate"
-												title={m.agressor.nome}
-											>
-												{m.agressor.nome}
-											</p>
-										</div>
-										<div className="text-right">
-											<p className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-												Vítima
-											</p>
-											<p
-												className="text-sm font-medium text-slate-100 truncate"
-												title={m.vitima.nome}
-											>
-												{m.vitima.nome}
-											</p>
-										</div>
-									</div>
-
-									<div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-800/60">
-										<div>
-											<p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">
-												Distância Atual
-											</p>
-											<p
-												className={`text-2xl font-mono font-bold drop-shadow-md ${theme.text}`}
-											>
-												{m.locAgressor?.isLocalizacaoOculta && !forceVisibility ? (
-													<span className="text-sm font-semibold text-emerald-500 uppercase flex items-center gap-1">
-														<ShieldCheck className="w-4 h-4" /> Dentro da Lei
-													</span>
-												) : m.distancia !== null ? (
-													`${Math.round(m.distancia)}m`
-												) : (
-													"S/ Sinal"
-												)}
-											</p>
-										</div>
-										<div className="text-right flex flex-col justify-end h-full pb-1">
-											<Badge
-												variant="outline"
-												className="bg-slate-950/50 text-slate-400 border-slate-700/50"
-											>
-												Limite: {m.raioProtecaoMetros}m
-											</Badge>
-										</div>
-									</div>
-								</CardContent>
-							</Card>
-						);
-					})
-				)}
-			</div>
+			{/* Sidebar da Direita: Lista de Alvos */}
+			<SidebarList
+				medidasComDistancia={medidasComDistancia}
+				medidaSelecionada={medidaSelecionada}
+				setMedidaSelecionada={setMedidaSelecionada}
+				forceVisibility={forceVisibility}
+			/>
 
 			{/* Mapa Modal Tático */}
 			{medidaSelecionada && (
 				<div className="fixed inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col animate-in fade-in duration-300">
-					{/* Header do Modal */}
-					<div className="h-20 bg-slate-950 border-b border-slate-800 flex items-center justify-between px-8 shadow-2xl z-50">
-						<div className="flex items-center gap-4">
-							{getStatusTheme(medidaSelecionada.statusRisco).icon}
-							<div>
-								<h2 className="text-xl font-bold text-slate-50 uppercase tracking-widest">
-									Visão Tática
-								</h2>
-								<p className="text-sm text-slate-400">
-									Agressor:{" "}
-									<span className="text-slate-200">
-										{medidaSelecionada.agressor.nome}
-									</span>{" "}
-									| Vítima:{" "}
-									<span className="text-slate-200">
-										{medidaSelecionada.vitima.nome}
-									</span>
-								</p>
-							</div>
-						</div>
+					{/* Painel de Controle de Risco Overlay (Modal Superior) */}
+					<AlertModal
+						medidaSelecionada={medidaSelecionada}
+						setMedidaSelecionada={setMedidaSelecionada}
+						forceVisibility={forceVisibility}
+						setForceVisibility={setForceVisibility}
+					/>
 
-						<div className="flex items-center gap-6">
-							<div className="text-right hidden md:block">
-								<p className="text-xs text-slate-500 uppercase font-semibold tracking-widest">
-									Distância Atual
-								</p>
-								<p
-									className={`text-xl font-mono font-bold ${getStatusTheme(medidaSelecionada.statusRisco).text}`}
-								>
-									{medidaSelecionada.distancia != null
-										? `${Math.round(medidaSelecionada.distancia as number)}m`
-										: "S/ Sinal"}
-								</p>
-							</div>
-							<div className="h-8 w-px bg-slate-800 hidden md:block"></div>
-							<button
-								type="button"
-								onClick={() => setMedidaSelecionada(null)}
-								className="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 rounded-lg p-2.5 transition-colors flex items-center gap-2 group"
-							>
-								<span className="text-sm font-semibold uppercase tracking-wider hidden sm:inline-block group-hover:text-white">
-									Fechar Mapa
-								</span>
-								<X className="w-5 h-5 group-hover:text-white" />
-							</button>
-						</div>
-					</div>
-
-					{/* Corpo do Mapa */}
 					<div className="flex-1 relative bg-slate-900">
 						<MapComponent
 							initialViewState={{
