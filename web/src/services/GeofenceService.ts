@@ -1,5 +1,5 @@
 import { PrismaClient, Monitorado, MedidaProtetiva, Telemetria } from "@prisma/client";
-import { systemEmitter } from "@/lib/eventEmitter";
+import { serverPusher } from "@/lib/pusher";
 
 const prisma = new PrismaClient();
 
@@ -72,7 +72,7 @@ export class GeofenceService {
 							anotacaoOperador: `Distância: ${Math.round(dist)}m. Limite: ${medida.raioProtecaoMetros}m`,
 						},
 					});
-					systemEmitter.emit("novo_alerta", alertaAproximacao);
+					serverPusher.trigger("map-channel", "alerta", alertaAproximacao);
 				}
 			}
 
@@ -106,7 +106,7 @@ export class GeofenceService {
 									anotacaoOperador: `Invasão de zona. Distância ao centro: ${Math.round(distZona)}m`,
 								},
 							});
-							systemEmitter.emit("novo_alerta", alertaZona);
+							serverPusher.trigger("map-channel", "alerta", alertaZona);
 						}
 					}
 				}

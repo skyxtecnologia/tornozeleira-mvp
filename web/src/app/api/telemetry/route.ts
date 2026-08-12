@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { systemEmitter } from "@/lib/eventEmitter";
 import { GeofenceService } from "@/services/GeofenceService";
+import { serverPusher } from "@/lib/pusher";
 
 const prisma = new PrismaClient();
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 					nivel: telemetria.bateria <= 15 ? "CRITICO" : "BAIXO",
 				},
 			});
-			systemEmitter.emit("novo_alerta", alerta);
+			serverPusher.trigger("map-channel", "alerta", alerta);
 		}
 
 		// 4. Lógica de Geofencing e Privacidade (Agressor)
@@ -80,10 +80,10 @@ export async function POST(request: Request) {
 
 		// 5. Aplicar Lei de Privacidade
 		// Se for agressor e NÃO estiver violando nenhuma medida/zona, ocultamos a localização no frontend.
-		const deveOcultar = monitorado?.tipo === "AGRESSOR" && !isViolating;
+		const isPrivacidadeAtiva = monitorado?.tipo === "AGRESSOR" && !isViolating;
 
-		// Dispara a telemetria pro frontend com os dados amigáveis (stream)
-		systemEmitter.emit("nova_telemetria", {
+		// 6. Transmitir localização anonimizada via Pusher para o mapa em tempo real
+		const telemetriaFinal = {
 			dispositivoId: dispositivo.id,
 			imei: dispositivo.imei,
 			tipoDispositivo: dispositivo.tipo,
@@ -94,24 +94,29 @@ export async function POST(request: Request) {
 						tipo: monitorado.tipo,
 					}
 				: null,
-			lat: telemetria.lat,
-			lng: telemetria.lng,
-			isLocalizacaoOculta: deveOcultar,
+			lat: isPrivacidadeAtiva ? null : telemetria.lat,
+			lng: isPrivacidadeAtiva ? null : telemetria.lng,
 			bateria: telemetria.bateria,
 			timestamp: telemetria.timestamp,
-			isOffline: telemetria.isOffline,
-		});
+			isOffline: false,
+			isLocalizacaoOculta: isPrivacidadeAtiva,
+		};
+
+		// Envia o evento de telemetria para o canal "map-channel"
+		serverPusher.trigger("map-channel", "telemetria", telemetriaFinal);
 
 		return NextResponse.json(
-			{ success: true, telemetriaId: telemetria.id },
+			{
+				success: true,
+				alertaGerado: isViolating,
+				privacidadeAplicada: isPrivacidadeAtiva,
+			},
 			{ status: 201 },
 		);
-	} catch (error: unknown) {
-		const errorMessage =
-			error instanceof Error ? error.message : "Erro desconhecido";
-		console.error("Erro na Ingestão de Telemetria:", error);
+	} catch (error) {
+		console.error("Erro ao registrar telemetria:", error);
 		return NextResponse.json(
-			{ error: "Erro interno no servidor", details: errorMessage },
+			{ error: "Erro interno no servidor" },
 			{ status: 500 },
 		);
 	}

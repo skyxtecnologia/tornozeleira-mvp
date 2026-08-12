@@ -17,11 +17,11 @@ import {
 	AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { systemEmitter } from "@/lib/eventEmitter";
 import { AlertModal } from "@/components/map/AlertModal";
 import { StatusCards } from "@/components/map/StatusCards";
 import { SidebarList } from "@/components/map/SidebarList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Pusher from "pusher-js";
 
 // Estilo 100% gratuito e open-source usando OpenStreetMap Raster Tiles
 const MAPLIBRE_STYLE = {
@@ -151,12 +151,15 @@ export default function TacticalMonitorPage() {
 		};
 		fetchData();
 
-		const eventSource = new EventSource("/api/stream");
+		// Inicializar Pusher
+		const pusher = new Pusher("b4c167b75eb392ad4548", {
+			cluster: "sa1",
+		});
 
-		eventSource.addEventListener("telemetria", (event) => {
+		const channel = pusher.subscribe("map-channel");
+
+		channel.bind("telemetria", (novaLocalizacao: Localizacao) => {
 			try {
-				const novaLocalizacao = JSON.parse(event.data) as Localizacao;
-
 				setPontos((prevPontos) => {
 					const index = prevPontos.findIndex(
 						(p) => p.dispositivoId === novaLocalizacao.dispositivoId,
@@ -171,7 +174,6 @@ export default function TacticalMonitorPage() {
 
 				setHistoricoRastro((prev) => {
 					const rastroAnterior = prev[novaLocalizacao.dispositivoId] || [];
-					// Verifica se o ponto realmente mudou para não entupir o array
 					const lastPoint = rastroAnterior[rastroAnterior.length - 1];
 					if (
 						lastPoint &&
@@ -182,7 +184,7 @@ export default function TacticalMonitorPage() {
 					}
 
 					if (novaLocalizacao.lng === null || novaLocalizacao.lat === null) {
-						return prev; // Não adiciona ao rastro se estiver oculto
+						return prev;
 					}
 
 					return {
@@ -190,17 +192,15 @@ export default function TacticalMonitorPage() {
 						[novaLocalizacao.dispositivoId]: [
 							...rastroAnterior,
 							{ lng: novaLocalizacao.lng, lat: novaLocalizacao.lat },
-						].slice(-500), // Mantém max 500 pontos no frontend para evitar lentidão
+						].slice(-500),
 					};
 				});
 			} catch (err) {
-				console.error("Erro ao parsear SSE telemetria", err);
+				console.error("Erro ao processar telemetria do Pusher", err);
 			}
 		});
 
-		eventSource.addEventListener("alerta", (event) => {
-			const alerta = JSON.parse(event.data);
-			// Evitar que o modal abra novamente se o alerta já estiver sendo tratado
+		channel.bind("alerta", (alerta: Alerta) => {
 			setAlertaAtivo((prev) => {
 				if (prev && prev.id === alerta.id) return prev;
 				return alerta;
@@ -208,7 +208,8 @@ export default function TacticalMonitorPage() {
 		});
 
 		return () => {
-			eventSource.close();
+			channel.unbind_all();
+			channel.unsubscribe();
 		};
 	}, []);
 

@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { systemEmitter } from "@/lib/eventEmitter";
+import { serverPusher } from "@/lib/pusher";
 
 const prisma = new PrismaClient();
 
@@ -45,8 +45,8 @@ export async function POST(request: Request) {
 			},
 		});
 
-		// Emite pro SSE para piscar a tela da central
-		systemEmitter.emit("novo_alerta", alerta);
+		// Emite para o mapa tático via Pusher
+		serverPusher.trigger("map-channel", "alerta", alerta);
 
 		return NextResponse.json(
 			{ success: true, alertaId: alerta.id },
