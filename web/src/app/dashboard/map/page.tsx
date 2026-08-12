@@ -413,17 +413,206 @@ export default function TacticalMonitorPage() {
 	}, [medidaSelecionada]);
 
 	return (
-		<div className="min-h-screen bg-slate-950 p-8 max-w-screen-2xl mx-auto space-y-8 animate-in fade-in duration-500">
-			{/* Container Absoluto sobre o Mapa para Cards de Status (Superior) */}
-			<div className="absolute top-4 left-4 right-4 md:right-auto z-10">
-				<StatusCards
-					medidasComDistancia={medidasComDistancia}
-					forceVisibility={forceVisibility}
-					setForceVisibility={setForceVisibility}
-				/>
+		<div className="flex h-[calc(100vh-4rem)] bg-slate-950 overflow-hidden">
+			{/* Main Map Area */}
+			<div className="flex-1 relative">
+				{/* Top Left Status Cards */}
+				<div className="absolute top-4 left-4 z-10">
+					<StatusCards
+						medidasComDistancia={medidasComDistancia}
+						forceVisibility={forceVisibility}
+						setForceVisibility={setForceVisibility}
+					/>
+				</div>
+
+				{/* Alert Modal Overlay (When a target is selected) */}
+				{medidaSelecionada && (
+					<AlertModal
+						medidaSelecionada={medidaSelecionada}
+						setMedidaSelecionada={setMedidaSelecionada}
+						forceVisibility={forceVisibility}
+						setForceVisibility={setForceVisibility}
+					/>
+				)}
+
+				{/* The Actual Map */}
+				<MapComponent
+					initialViewState={
+						medidaSelecionada
+							? {
+									longitude:
+										medidaSelecionada.locAgressor &&
+										medidaSelecionada.locAgressor.lng !== null &&
+										medidaSelecionada.locVitima &&
+										medidaSelecionada.locVitima.lng !== null
+											? (medidaSelecionada.locAgressor.lng +
+													medidaSelecionada.locVitima.lng) /
+												2
+											: medidaSelecionada.locAgressor?.lng || -41.776,
+									latitude:
+										medidaSelecionada.locAgressor &&
+										medidaSelecionada.locAgressor.lat !== null &&
+										medidaSelecionada.locVitima &&
+										medidaSelecionada.locVitima.lat !== null
+											? (medidaSelecionada.locAgressor.lat +
+													medidaSelecionada.locVitima.lat) /
+												2
+											: medidaSelecionada.locAgressor?.lat || -22.378,
+									zoom: 14.5,
+								}
+							: {
+									longitude: -41.776, // Centro de Macaé
+									latitude: -22.378,
+									zoom: 12,
+								}
+					}
+					style={{ width: "100%", height: "100%" }}
+					// biome-ignore lint/suspicious/noExplicitAny: MAPLIBRE Style Format
+					mapStyle={MAPLIBRE_STYLE as any}
+				>
+					{/* Zonas and Tracks - Only render if selected */}
+					{medidaSelecionada && zonaExclusaoGeoJSON && (
+						<Source
+							id="zona-movel-source"
+							type="geojson"
+							// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
+							data={zonaExclusaoGeoJSON as any}
+						>
+							<Layer
+								id="zona-movel-fill"
+								type="fill"
+								paint={{ "fill-color": "#3b82f6", "fill-opacity": 0.1 }}
+							/>
+							<Layer
+								id="zona-movel-line"
+								type="line"
+								paint={{
+									"line-color": "#3b82f6",
+									"line-width": 2,
+									"line-opacity": 0.6,
+								}}
+							/>
+						</Source>
+					)}
+
+					{medidaSelecionada && zonasFixasGeoJSON && (
+						<Source
+							id="zonas-fixas-source"
+							type="geojson"
+							// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
+							data={zonasFixasGeoJSON as any}
+						>
+							<Layer
+								id="zonas-fixas-fill"
+								type="fill"
+								paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
+							/>
+							<Layer
+								id="zonas-fixas-line"
+								type="line"
+								paint={{
+									"line-color": "#ef4444",
+									"line-width": 2,
+									"line-dasharray": [2, 2],
+								}}
+							/>
+						</Source>
+					)}
+
+					{medidaSelecionada && rastroAgressorGeoJSON && (
+						<Source
+							id="rastro-source"
+							type="geojson"
+							// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
+							data={rastroAgressorGeoJSON as any}
+						>
+							<Layer
+								id="rastro-layer"
+								type="line"
+								paint={{
+									"line-color": "#ef4444",
+									"line-width": 4,
+									"line-opacity": 0.8,
+									"line-dasharray": [2, 1],
+								}}
+							/>
+						</Source>
+					)}
+
+					{/* Global Points (Rendered for ALL targets) */}
+					{pontos
+						.filter((p) => p.lat !== null && p.lng !== null)
+						.filter((p) => forceVisibility || !p.isLocalizacaoOculta)
+						.map((ponto) => {
+							const isVitima = ponto.tipoDispositivo === "DAV";
+							
+							let isEnvolvido = false;
+							let isCritico = false;
+							
+							if (medidaSelecionada) {
+								isEnvolvido =
+									ponto.dispositivoId ===
+										medidaSelecionada.agressor.dispositivoId ||
+									ponto.dispositivoId ===
+										medidaSelecionada.vitima.dispositivoId;
+								isCritico = medidaSelecionada.statusRisco === "CRITICO";
+							} else {
+								// Se não há medida selecionada, destaque todos que estão em risco Crítico
+								const medidaDoPonto = medidasComDistancia.find(
+									m => m.agressor.dispositivoId === ponto.dispositivoId || m.vitima.dispositivoId === ponto.dispositivoId
+								);
+								if (medidaDoPonto && medidaDoPonto.statusRisco === "CRITICO") {
+									isEnvolvido = true;
+									isCritico = true;
+								}
+							}
+
+							return (
+								<Marker
+									key={ponto.dispositivoId}
+									longitude={ponto.lng as number}
+									latitude={ponto.lat as number}
+									anchor="bottom"
+								>
+									<div
+										className={`relative flex items-center justify-center cursor-pointer group ${isEnvolvido ? "scale-125 z-50" : "opacity-70 hover:opacity-100 z-10"}`}
+									>
+										{isVitima && isEnvolvido && (
+											<div className="absolute w-12 h-12 bg-blue-500/30 rounded-full animate-ping" />
+										)}
+										{!isVitima && isEnvolvido && isCritico && (
+											<div className="absolute w-12 h-12 bg-red-500/30 rounded-full animate-ping" />
+										)}
+										<MapPin
+											className={`drop-shadow-2xl transition-transform ${
+												isEnvolvido ? "w-10 h-10" : "w-6 h-6"
+											} ${
+												isVitima
+													? "text-blue-500 fill-blue-500/20"
+													: "text-red-500 fill-red-500/20"
+											}`}
+										/>
+										<div className="absolute top-10 bg-slate-900 border border-slate-700 text-white text-xs px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap font-semibold tracking-wider uppercase hidden group-hover:block z-50">
+											{ponto.monitorado?.nome || "Desconhecido"}
+										</div>
+									</div>
+								</Marker>
+							);
+						})}
+				</MapComponent>
+
+				{/* HUD Overlay */}
+				{medidaSelecionada && (
+					<div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
+						<div className="w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full border border-slate-500/30"></div>
+						<div className="w-[25vw] h-[25vw] max-w-[300px] max-h-[300px] absolute rounded-full border border-slate-500/20"></div>
+						<div className="absolute w-px h-full bg-slate-500/10"></div>
+						<div className="absolute w-full h-px bg-slate-500/10"></div>
+					</div>
+				)}
 			</div>
 
-			{/* Sidebar da Direita: Lista de Alvos */}
+			{/* Sidebar List (Right) */}
 			<SidebarList
 				medidasComDistancia={medidasComDistancia}
 				medidaSelecionada={medidaSelecionada}
@@ -431,177 +620,7 @@ export default function TacticalMonitorPage() {
 				forceVisibility={forceVisibility}
 			/>
 
-			{/* Mapa Modal Tático */}
-			{medidaSelecionada && (
-				<div className="fixed inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col animate-in fade-in duration-300">
-					{/* Painel de Controle de Risco Overlay (Modal Superior) */}
-					<AlertModal
-						medidaSelecionada={medidaSelecionada}
-						setMedidaSelecionada={setMedidaSelecionada}
-						forceVisibility={forceVisibility}
-						setForceVisibility={setForceVisibility}
-					/>
-
-					<div className="flex-1 relative bg-slate-900">
-						<MapComponent
-							initialViewState={{
-								longitude:
-									medidaSelecionada.locAgressor &&
-									medidaSelecionada.locAgressor.lng !== null &&
-									medidaSelecionada.locVitima &&
-									medidaSelecionada.locVitima.lng !== null
-										? (medidaSelecionada.locAgressor.lng +
-												medidaSelecionada.locVitima.lng) /
-											2
-										: medidaSelecionada.locAgressor?.lng || -51.23,
-								latitude:
-									medidaSelecionada.locAgressor &&
-									medidaSelecionada.locAgressor.lat !== null &&
-									medidaSelecionada.locVitima &&
-									medidaSelecionada.locVitima.lat !== null
-										? (medidaSelecionada.locAgressor.lat +
-												medidaSelecionada.locVitima.lat) /
-											2
-										: medidaSelecionada.locAgressor?.lat || -30.033,
-								zoom: 14.5,
-							}}
-							style={{ width: "100%", height: "100%" }}
-							// biome-ignore lint/suspicious/noExplicitAny: MAPLIBRE Style Format
-							mapStyle={MAPLIBRE_STYLE as any}
-						>
-							{/* Renderiza Zona de Exclusão Móvel (Vítima) e Rastro Histórico */}
-							{zonaExclusaoGeoJSON && (
-								<Source
-									id="zona-movel-source"
-									type="geojson"
-									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
-									data={zonaExclusaoGeoJSON as any}
-								>
-									<Layer
-										id="zona-movel-fill"
-										type="fill"
-										paint={{ "fill-color": "#3b82f6", "fill-opacity": 0.1 }}
-									/>
-									<Layer
-										id="zona-movel-line"
-										type="line"
-										paint={{
-											"line-color": "#3b82f6",
-											"line-width": 2,
-											"line-opacity": 0.6,
-										}}
-									/>
-								</Source>
-							)}
-
-							{/* Renderiza Zonas de Exclusão Fixas */}
-							{zonasFixasGeoJSON && (
-								<Source
-									id="zonas-fixas-source"
-									type="geojson"
-									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
-									data={zonasFixasGeoJSON as any}
-								>
-									<Layer
-										id="zonas-fixas-fill"
-										type="fill"
-										paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
-									/>
-									<Layer
-										id="zonas-fixas-line"
-										type="line"
-										paint={{
-											"line-color": "#ef4444",
-											"line-width": 2,
-											"line-dasharray": [2, 2],
-										}}
-									/>
-								</Source>
-							)}
-
-							{rastroAgressorGeoJSON && (
-								<Source
-									id="rastro-source"
-									type="geojson"
-									// biome-ignore lint/suspicious/noExplicitAny: GeoJSON compatibility
-									data={rastroAgressorGeoJSON as any}
-								>
-									<Layer
-										id="rastro-layer"
-										type="line"
-										paint={{
-											"line-color": "#ef4444",
-											"line-width": 4,
-											"line-opacity": 0.8,
-											"line-dasharray": [2, 1],
-										}}
-									/>
-								</Source>
-							)}
-
-							{/* Renderiza todos os pontos no mapa para contexto geral */}
-							{pontos
-								.filter((p) => p.lat !== null && p.lng !== null)
-								.filter((p) => forceVisibility || !p.isLocalizacaoOculta)
-								.map((ponto) => {
-									const isVitima = ponto.tipoDispositivo === "DAV";
-									// Destaca os pinos que fazem parte dessa medida específica
-									const isEnvolvido =
-										ponto.dispositivoId ===
-											medidaSelecionada.agressor.dispositivoId ||
-										ponto.dispositivoId ===
-											medidaSelecionada.vitima.dispositivoId;
-
-									return (
-										<Marker
-											key={ponto.dispositivoId}
-											longitude={ponto.lng as number}
-											latitude={ponto.lat as number}
-											anchor="bottom"
-										>
-											<div
-												className={`relative flex items-center justify-center cursor-pointer group ${isEnvolvido ? "scale-125 z-50" : "opacity-40 hover:opacity-100 z-10"}`}
-											>
-												{isVitima && isEnvolvido && (
-													<div className="absolute w-12 h-12 bg-blue-500/30 rounded-full animate-ping" />
-												)}
-												{!isVitima &&
-													isEnvolvido &&
-													medidaSelecionada.statusRisco === "CRITICO" && (
-														<div className="absolute w-12 h-12 bg-red-500/30 rounded-full animate-ping" />
-													)}
-												<MapPin
-													className={`drop-shadow-2xl transition-transform ${
-														isEnvolvido ? "w-10 h-10" : "w-6 h-6"
-													} ${
-														isVitima
-															? "text-blue-500 fill-blue-500/20"
-															: "text-red-500 fill-red-500/20"
-													}`}
-												/>
-												{isEnvolvido && (
-													<div className="absolute top-10 bg-slate-900 border border-slate-700 text-white text-xs px-3 py-1.5 rounded-md shadow-xl whitespace-nowrap font-semibold tracking-wider uppercase">
-														{ponto.monitorado?.nome || "Desconhecido"}
-													</div>
-												)}
-											</div>
-										</Marker>
-									);
-								})}
-						</MapComponent>
-
-						{/* HUD Sobreposto no Mapa (Targeting Reticle Style) */}
-						<div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
-							<div className="w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] rounded-full border border-slate-500/30"></div>
-							<div className="w-[25vw] h-[25vw] max-w-[300px] max-h-[300px] absolute rounded-full border border-slate-500/20"></div>
-							<div className="absolute w-px h-full bg-slate-500/10"></div>
-							<div className="absolute w-full h-px bg-slate-500/10"></div>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* Modal de Alerta Crítico Global (Sobrepõe tudo se houver evento do banco) */}
+			{/* Global Critical Alert Modal */}
 			{alertaAtivo && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-lg">
 					<div className="bg-slate-950 border border-red-900 rounded-2xl p-10 max-w-xl w-full shadow-[0_0_100px_rgba(239,68,68,0.2)] flex flex-col items-center animate-in zoom-in-95 duration-200">
