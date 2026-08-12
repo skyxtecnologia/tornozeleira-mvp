@@ -4,10 +4,9 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-export async function GET() {
+export async function POST(request: Request) {
 	try {
 		// Proteção vital: Verifica se já existe algum usuário no banco.
-		// Se existir, bloqueia a rota para sempre para que invasores não consigam criar novos admins.
 		const count = await prisma.usuario.count();
 		if (count > 0) {
 			return NextResponse.json(
@@ -16,15 +15,24 @@ export async function GET() {
 			);
 		}
 
+		const body = await request.json();
+		const { nome, email, senha } = body;
+
+		if (!nome || !email || !senha) {
+			return NextResponse.json(
+				{ error: "Nome, email e senha são obrigatórios." },
+				{ status: 400 },
+			);
+		}
+
 		const salt = await bcrypt.genSalt(10);
-		// Senha forte para produção
-		const hash = await bcrypt.hash("Skyx@Admin2026!", salt);
+		const hash = await bcrypt.hash(senha, salt);
 
 		const admin = await prisma.usuario.create({
 			data: {
-				id: "admin-master",
-				nome: "Comandante Operacional",
-				email: "admin@skyx.com.br",
+				id: `admin-${Date.now()}`,
+				nome,
+				email,
 				senhaHash: hash,
 				role: "ADMIN",
 			},
@@ -33,10 +41,6 @@ export async function GET() {
 		return NextResponse.json({
 			success: true,
 			message: "Usuário Master criado com sucesso e rota bloqueada permanentemente!",
-			credenciais: {
-				email: admin.email,
-				senha: "Skyx@Admin2026!",
-			},
 		});
 	} catch (error) {
 		console.error("Erro no setup:", error);
