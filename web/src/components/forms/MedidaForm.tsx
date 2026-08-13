@@ -59,11 +59,14 @@ export function MedidaForm() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(data),
 			});
+			
+			const json = await res.json();
+			
 			if (res.ok) {
 				setStatus("Medida Protetiva cadastrada com sucesso!");
 				e.currentTarget.reset();
 			} else {
-				setStatus("Erro ao cadastrar medida.");
+				setStatus(`Erro: ${json.error || "Falha ao cadastrar medida."}`);
 			}
 		} catch (_error) {
 			setStatus("Erro de conexão.");
@@ -178,7 +181,11 @@ export function MedidaForm() {
 						{loading ? "Salvando..." : "Salvar Medida"}
 					</Button>
 					{status && (
-						<p className="text-sm mt-2 text-center text-emerald-400">
+						<p
+							className={`text-sm mt-2 text-center ${
+								status.includes("Erro") ? "text-red-400" : "text-emerald-400"
+							}`}
+						>
 							{status}
 						</p>
 					)}

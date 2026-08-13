@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
 export default function DashboardLayout({
@@ -21,8 +21,29 @@ export default function DashboardLayout({
 	children: React.ReactNode;
 }) {
 	const [isCollapsed, setIsCollapsed] = useState(false);
+	const [operadorNome, setOperadorNome] = useState("Carregando...");
 	const pathname = usePathname();
 	const router = useRouter();
+
+	useEffect(() => {
+		fetch("/api/auth/me")
+			.then((res) => res.json())
+			.then((data) => {
+				if (data?.user?.nome) {
+					setOperadorNome(data.user.nome);
+				}
+			})
+			.catch(console.error);
+
+		const handlePerfilUpdate = (e: any) => {
+			if (e.detail?.nome) {
+				setOperadorNome(e.detail.nome);
+			}
+		};
+
+		window.addEventListener("perfilUpdated", handlePerfilUpdate);
+		return () => window.removeEventListener("perfilUpdated", handlePerfilUpdate);
+	}, []);
 
 	const handleLogout = async () => {
 		await fetch("/api/auth/logout", { method: "POST" });
@@ -167,7 +188,7 @@ export default function DashboardLayout({
 							<span className="text-slate-400 hidden sm:inline-block">
 								Operador:
 							</span>
-							<span className="font-medium">João Silva</span>
+							<span className="font-medium max-w-[150px] truncate" title={operadorNome}>{operadorNome}</span>
 							<Badge
 								variant="outline"
 								className="ml-2 border-slate-700 bg-slate-900 text-slate-300 hidden sm:inline-flex"

@@ -16,11 +16,17 @@ export async function POST(request: Request) {
 			observacoes,
 		} = body;
 
-		if (!numeroProcesso || !agressorId || !vitimaId || !raioProtecaoMetros) {
-			return NextResponse.json(
-				{ error: "Campos obrigatórios ausentes" },
-				{ status: 400 },
-			);
+		if (!numeroProcesso) {
+			return NextResponse.json({ error: "Número do Processo é obrigatório." }, { status: 400 });
+		}
+		if (!agressorId) {
+			return NextResponse.json({ error: "Por favor, selecione um Agressor válido." }, { status: 400 });
+		}
+		if (!vitimaId) {
+			return NextResponse.json({ error: "Por favor, selecione uma Vítima válida." }, { status: 400 });
+		}
+		if (!raioProtecaoMetros) {
+			return NextResponse.json({ error: "O Raio de Proteção é obrigatório." }, { status: 400 });
 		}
 
 		const medida = await prisma.medidaProtetiva.create({
