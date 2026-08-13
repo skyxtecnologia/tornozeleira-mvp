@@ -26,7 +26,6 @@ export function OperadorForm() {
 	const handleSubmit = async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setLoading(true);
-		setStatus("");
 		setError("");
 		setSuccess(false);
 
@@ -46,7 +45,6 @@ export function OperadorForm() {
 
 			if (res.ok) {
 				setSuccess(true);
-				setStatus("Operador cadastrado com sucesso!");
 				form.reset();
 				setFormData({ nome: "", email: "", senha: "", role: "OPERADOR" });
 			} else {
