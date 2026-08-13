@@ -2,15 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, MapPin, Radio, ShieldCheck, Battery } from "lucide-react";
+import { ShieldAlert, MapPin, Radio, Activity, Battery } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default function MobileTrackerPage() {
+export default function MobileAgressorTrackerPage() {
 	const router = useRouter();
 	const [nome, setNome] = useState("");
 	const [imei, setImei] = useState("");
-	const [status, setStatus] = useState<"Buscando GPS..." | "Conectado" | "Sem Sinal GPS" | "Erro">("Buscando GPS...");
+	const [status, setStatus] = useState<"Buscando GPS..." | "Transmitindo" | "Sem Sinal GPS" | "Erro">("Buscando GPS...");
 	const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 	const [batteryLevel, setBatteryLevel] = useState<number>(100);
 	
@@ -19,17 +19,17 @@ export default function MobileTrackerPage() {
 	const watchIdRef = useRef<number | null>(null);
 
 	useEffect(() => {
-		// 1. Recupera os dados da Vítima
-		const storedImei = localStorage.getItem("vitima_imei");
-		const storedNome = localStorage.getItem("vitima_nome");
+		// 1. Recupera os dados do Agressor
+		const storedImei = localStorage.getItem("agressor_imei");
+		const storedNome = localStorage.getItem("agressor_nome");
 
 		if (!storedImei) {
-			router.push("/mobile/vitima");
+			router.push("/mobile/agressor");
 			return;
 		}
 
 		setImei(storedImei);
-		setNome(storedNome || "Cidadão");
+		setNome(storedNome || "Monitorado");
 
 		// 2. Busca a bateria real do celular (Web Battery API)
 		if ('getBattery' in navigator) {
@@ -54,7 +54,7 @@ export default function MobileTrackerPage() {
 						lng: position.coords.longitude,
 					};
 					if (status === "Buscando GPS...") {
-						setStatus("Conectado");
+						setStatus("Transmitindo");
 					}
 				},
 				(error) => {
@@ -67,7 +67,7 @@ export default function MobileTrackerPage() {
 			setStatus("Erro");
 		}
 
-		// 3. Loop de transmissão a cada 4 segundos
+		// 4. Loop de transmissão a cada 4 segundos
 		intervalRef.current = setInterval(async () => {
 			if (coordsRef.current && storedImei) {
 				try {
@@ -78,12 +78,12 @@ export default function MobileTrackerPage() {
 							imei: storedImei,
 							lat: coordsRef.current.lat,
 							lng: coordsRef.current.lng,
-							bateria: batteryLevel, // mock bateria celular
+							bateria: batteryLevel, // Usa a bateria capturada (real ou mock)
 							offline: false,
 						}),
 					});
 					setLastUpdate(new Date());
-					setStatus("Conectado");
+					setStatus("Transmitindo");
 				} catch (err) {
 					console.error("Erro ao enviar telemetria", err);
 				}
@@ -94,29 +94,24 @@ export default function MobileTrackerPage() {
 			if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
 			if (intervalRef.current) clearInterval(intervalRef.current);
 		};
-	}, [router]);
-
-	const handlePanico = async () => {
-		alert("ALERTA DE PÂNICO ENVIADO PARA A CENTRAL!");
-		// Aqui poderíamos chamar um /api/panico real
-	};
+	}, [router, status, batteryLevel]);
 
 	return (
 		<div className="min-h-screen bg-slate-950 flex flex-col p-4 relative overflow-hidden">
-			{/* Efeitos de radar no fundo */}
-			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/5 rounded-full border border-indigo-500/10 animate-ping" style={{ animationDuration: '4s' }} />
-			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full border border-indigo-500/20 animate-ping" style={{ animationDuration: '4s', animationDelay: '1s' }} />
+			{/* Efeitos de radar no fundo (Vermelho para Agressor) */}
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-red-500/5 rounded-full border border-red-500/10 animate-ping" style={{ animationDuration: '4s' }} />
+			<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-red-500/10 rounded-full border border-red-500/20 animate-ping" style={{ animationDuration: '4s', animationDelay: '1s' }} />
 			
 			<div className="flex-1 flex flex-col z-10 space-y-6">
 				{/* Cabeçalho */}
 				<div className="flex items-center justify-between p-2">
 					<div>
-						<h1 className="text-xl font-bold text-slate-100 truncate">Olá, {nome}</h1>
-						<p className="text-sm text-slate-400">Sistema de Proteção (DAV)</p>
+						<h1 className="text-xl font-bold text-slate-100 truncate">{nome}</h1>
+						<p className="text-sm text-slate-400">Tornozeleira Eletrônica (Simulador)</p>
 					</div>
 					<Button variant="outline" className="border-slate-800 text-slate-400 bg-slate-900" onClick={() => {
 						localStorage.clear();
-						router.push("/mobile/vitima");
+						router.push("/mobile/agressor");
 					}}>
 						Sair
 					</Button>
@@ -126,17 +121,17 @@ export default function MobileTrackerPage() {
 				<div className="flex items-center justify-between bg-slate-900/50 backdrop-blur-md border border-slate-800 p-3 rounded-xl shadow-lg">
 					<div className="flex items-center gap-2">
 						<Battery className={`w-5 h-5 ${batteryLevel > 20 ? 'text-emerald-400' : 'text-red-500 animate-pulse'}`} />
-						<span className="text-slate-200 font-medium">Bateria do Equipamento (DAV)</span>
+						<span className="text-slate-200 font-medium">Bateria do Equipamento</span>
 					</div>
 					<div className="text-lg font-bold text-slate-100">{batteryLevel}%</div>
 				</div>
 
 				{/* Status Card */}
-				<Card className="bg-slate-900/80 backdrop-blur-md border-indigo-500/30 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+				<Card className="bg-slate-900/80 backdrop-blur-md border-red-500/30 shadow-[0_0_30px_rgba(220,38,38,0.1)]">
 					<CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-4">
 						<div className="relative">
-							{status === "Conectado" ? (
-								<ShieldCheck className="w-16 h-16 text-indigo-400" />
+							{status === "Transmitindo" ? (
+								<Activity className="w-16 h-16 text-red-500 animate-pulse" />
 							) : (
 								<Radio className="w-16 h-16 text-amber-500 animate-pulse" />
 							)}
@@ -144,19 +139,19 @@ export default function MobileTrackerPage() {
 						
 						<div>
 							<h2 className="text-2xl font-bold text-slate-100">
-								{status === "Conectado" ? "Proteção Ativa" : status}
+								{status === "Transmitindo" ? "Transmitindo Ativamente" : status}
 							</h2>
 							<p className="text-slate-400 text-sm mt-1">
-								{status === "Conectado" 
-									? "Sua localização está sendo transmitida em tempo real para a Guarda Municipal." 
+								{status === "Transmitindo" 
+									? "A sua localização está sendo monitorada pela Justiça." 
 									: "Por favor, permita o acesso ao GPS do celular."}
 							</p>
 						</div>
 
-						{lastUpdate && status === "Conectado" && (
-							<div className="flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-								<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-								Último sinal: {lastUpdate.toLocaleTimeString()}
+						{lastUpdate && status === "Transmitindo" && (
+							<div className="flex items-center gap-2 text-xs font-medium text-red-400 bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
+								<span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+								Sinal enviado: {lastUpdate.toLocaleTimeString()}
 							</div>
 						)}
 					</CardContent>
@@ -166,21 +161,18 @@ export default function MobileTrackerPage() {
 				<div className="flex items-center gap-3 bg-slate-900 border border-slate-800 p-4 rounded-xl">
 					<MapPin className="w-6 h-6 text-slate-500 shrink-0" />
 					<div className="text-sm text-slate-400">
-						Mantenha o GPS do celular ligado e este aplicativo aberto enquanto precisar de proteção.
+						Ao se aproximar da vítima ou violar uma zona, um alerta será gerado na central.
 					</div>
 				</div>
 
 				<div className="flex-1" />
 
-				{/* Botão de Pânico Gigante */}
-				<button
-					onClick={handlePanico}
-					className="w-full aspect-square max-h-[300px] max-w-[300px] mx-auto bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-full flex flex-col items-center justify-center shadow-[0_0_50px_rgba(220,38,38,0.4)] transition-all active:scale-95 border-8 border-red-900/50"
-				>
-					<ShieldAlert className="w-16 h-16 mb-2" />
-					<span className="text-2xl font-black tracking-widest uppercase">Pânico</span>
-					<span className="text-sm font-medium mt-1 opacity-80">Segure para acionar</span>
-				</button>
+				<div className="text-center opacity-50 pb-4">
+					<ShieldAlert className="w-8 h-8 mx-auto text-slate-500 mb-2" />
+					<p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
+						Simulador Operacional
+					</p>
+				</div>
 			</div>
 		</div>
 	);
