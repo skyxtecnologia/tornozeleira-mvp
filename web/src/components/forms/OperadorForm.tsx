@@ -23,11 +23,15 @@ export function OperadorForm() {
 		role: "OPERADOR",
 	});
 
-	const handleSubmit = async (e: React.FormEvent) => {
+	const handleSubmit = async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setLoading(true);
+		setStatus("");
 		setError("");
 		setSuccess(false);
+
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 
 		try {
 			const res = await fetch("/api/auth/register", {
@@ -35,18 +39,21 @@ export function OperadorForm() {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(formData),
+				body: JSON.stringify(Object.fromEntries(formData)),
 			});
 
 			const data = await res.json();
 
 			if (res.ok) {
 				setSuccess(true);
+				setStatus("Operador cadastrado com sucesso!");
+				form.reset();
 				setFormData({ nome: "", email: "", senha: "", role: "OPERADOR" });
 			} else {
 				setError(data.error || "Erro ao registrar usuário.");
 			}
-		} catch (_err) {
+		} catch (error) {
+			console.error(error);
 			setError("Erro de comunicação com o servidor.");
 		} finally {
 			setLoading(false);

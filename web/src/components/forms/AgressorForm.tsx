@@ -23,7 +23,8 @@ export function AgressorForm() {
 		setLoading(true);
 		setStatus("");
 
-		const formData = new FormData(e.currentTarget);
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 		const data = {
 			nome: formData.get("nome"),
 			cpf: formData.get("cpf"),
@@ -40,13 +41,14 @@ export function AgressorForm() {
 			});
 			if (res.ok) {
 				setStatus("Agressor cadastrado com sucesso!");
-				e.currentTarget.reset();
+				form.reset();
 				setEndereco("");
 			} else {
 				const json = await res.json();
 				setStatus(`Erro: ${json.error || "Falha ao cadastrar agressor."}`);
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error(error);
 			setStatus("Erro de conexão.");
 		}
 		setLoading(false);

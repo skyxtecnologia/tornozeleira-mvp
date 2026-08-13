@@ -21,7 +21,8 @@ export function DispositivoForm() {
 		setLoading(true);
 		setStatus("");
 
-		const formData = new FormData(e.currentTarget);
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 		const data = {
 			imei: formData.get("imei"),
 			serial: formData.get("serial"),
@@ -36,11 +37,12 @@ export function DispositivoForm() {
 			});
 			if (res.ok) {
 				setStatus("Dispositivo cadastrado com sucesso!");
-				e.currentTarget.reset();
+				form.reset();
 			} else {
 				setStatus("Erro ao cadastrar dispositivo.");
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error(error);
 			setStatus("Erro de conexão.");
 		}
 		setLoading(false);

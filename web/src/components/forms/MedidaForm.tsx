@@ -42,7 +42,8 @@ export function MedidaForm() {
 		setLoading(true);
 		setStatus("");
 
-		const formData = new FormData(e.currentTarget);
+		const form = e.currentTarget;
+		const formData = new FormData(form);
 		const data = {
 			numeroProcesso: formData.get("numeroProcesso"),
 			agressorId: formData.get("agressorId"),
@@ -64,11 +65,12 @@ export function MedidaForm() {
 			
 			if (res.ok) {
 				setStatus("Medida Protetiva cadastrada com sucesso!");
-				e.currentTarget.reset();
+				form.reset();
 			} else {
 				setStatus(`Erro: ${json.error || "Falha ao cadastrar medida."}`);
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error(error);
 			setStatus("Erro de conexão.");
 		}
 		setLoading(false);
