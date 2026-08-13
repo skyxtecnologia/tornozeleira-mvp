@@ -11,30 +11,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AddressAutocomplete } from "./AddressAutocomplete";
 
 export function AgressorForm() {
 	const [loading, setLoading] = useState(false);
 	const [status, setStatus] = useState("");
-	const [cep, setCep] = useState("");
 	const [endereco, setEndereco] = useState("");
-	const [loadingCep, setLoadingCep] = useState(false);
-
-	const buscarCep = async (valorCep: string) => {
-		const cepLimpo = valorCep.replace(/\D/g, "");
-		if (cepLimpo.length === 8) {
-			setLoadingCep(true);
-			try {
-				const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
-				const data = await res.json();
-				if (!data.erro) {
-					setEndereco(`${data.logradouro}, Número: , ${data.bairro}, ${data.localidade} - ${data.uf}`);
-				}
-			} catch (error) {
-				console.error("Erro ao buscar CEP", error);
-			}
-			setLoadingCep(false);
-		}
-	};
 
 	async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
@@ -59,7 +41,6 @@ export function AgressorForm() {
 			if (res.ok) {
 				setStatus("Agressor cadastrado com sucesso!");
 				e.currentTarget.reset();
-				setCep("");
 				setEndereco("");
 			} else {
 				const json = await res.json();
@@ -111,35 +92,14 @@ export function AgressorForm() {
 								placeholder="(22) 99999-9999"
 							/>
 						</div>
-						<div className="space-y-2">
-							<Label htmlFor="cep">CEP (Preenchimento Automático)</Label>
-							<div className="relative">
-								<Input
-									id="cep"
-									name="cep"
-									value={cep}
-									onChange={(e) => {
-										setCep(e.target.value);
-										if (e.target.value.length >= 8) {
-											buscarCep(e.target.value);
-										}
-									}}
-									maxLength={9}
-									className="bg-slate-950 border-slate-800"
-									placeholder="27910-000"
-								/>
-								{loadingCep && <span className="absolute right-3 top-2 text-xs text-slate-400">Buscando...</span>}
-							</div>
-						</div>
 						<div className="space-y-2 md:col-span-2">
-							<Label htmlFor="endereco">Endereço Principal (Opcional)</Label>
-							<Input
+							<Label htmlFor="endereco">Busca de Endereço Automática</Label>
+							<AddressAutocomplete
 								id="endereco"
 								name="endereco"
 								value={endereco}
-								onChange={(e) => setEndereco(e.target.value)}
-								className="bg-slate-950 border-slate-800"
-								placeholder="Rua das Flores, 123"
+								onChange={setEndereco}
+								placeholder="Digite o CEP ou Nome da Rua/Bairro para buscar..."
 							/>
 						</div>
 					</div>

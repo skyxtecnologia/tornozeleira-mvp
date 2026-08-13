@@ -13,8 +13,12 @@ import { MedidaForm } from "@/components/forms/MedidaForm";
 import { OperadorForm } from "@/components/forms/OperadorForm";
 import { VitimaForm } from "@/components/forms/VitimaForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function CadastrosPage() {
+	const searchParams = useSearchParams();
+	const router = useRouter();
+	const initialTab = searchParams.get("tab") || "vitimas";
 	return (
 		<div className="flex h-full w-full flex-col bg-slate-950 p-6 overflow-y-auto">
 			<div className="mb-6">
@@ -27,7 +31,13 @@ export default function CadastrosPage() {
 				</p>
 			</div>
 
-			<Tabs defaultValue="vitimas" className="w-full max-w-4xl mx-auto">
+			<Tabs 
+				defaultValue={initialTab} 
+				className="w-full max-w-4xl mx-auto"
+				onValueChange={(val) => {
+					router.replace(`/dashboard/cadastros?tab=${val}`, { scroll: false });
+				}}
+			>
 				<TabsList className="grid w-full grid-cols-5 bg-slate-900 border border-slate-800">
 					<TabsTrigger
 						value="operadores"

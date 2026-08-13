@@ -95,19 +95,30 @@ export default function ConfiguracoesPage() {
 				<CardHeader>
 					<CardTitle>Meu Perfil</CardTitle>
 					<CardDescription className="text-slate-400">
-						Sua conta tem nível de acesso: <span className="text-indigo-400 font-bold">{role}</span>
+						Visualize e edite as informações da sua conta.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<form onSubmit={onSubmit} className="space-y-4">
-						<div className="space-y-2">
-							<Label htmlFor="email" className="text-slate-400">E-mail (Não editável)</Label>
-							<Input
-								id="email"
-								value={email}
-								disabled
-								className="bg-slate-950/50 border-slate-800 text-slate-500 cursor-not-allowed"
-							/>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-2">
+								<Label htmlFor="email" className="text-slate-400">E-mail (Não editável)</Label>
+								<Input
+									id="email"
+									value={email}
+									disabled
+									className="bg-slate-950/50 border-slate-800 text-slate-500 cursor-not-allowed"
+								/>
+							</div>
+							<div className="space-y-2">
+								<Label htmlFor="role" className="text-slate-400">Nível de Acesso (Não editável)</Label>
+								<Input
+									id="role"
+									value={role}
+									disabled
+									className="bg-slate-950/50 border-slate-800 text-indigo-400/70 font-semibold cursor-not-allowed"
+								/>
+							</div>
 						</div>
 
 						<div className="space-y-2">

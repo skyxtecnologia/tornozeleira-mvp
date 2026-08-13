@@ -39,6 +39,15 @@ export default async function MedidasPage() {
 					exclusão das medidas ativas.
 				</p>
 			</div>
+			
+			<div className="flex justify-end">
+				<Link href="/dashboard/cadastros?tab=medidas">
+					<button type="button" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md transition-colors flex items-center gap-2 shadow-lg shadow-indigo-500/20">
+						<ShieldAlert className="w-5 h-5" />
+						Cadastrar Nova Medida
+					</button>
+				</Link>
+			</div>
 
 			<div className="grid gap-6 md:grid-cols-3 mb-8">
 				<Card className="bg-slate-900/50 border-slate-800">
