@@ -13,12 +13,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+interface Dispositivo {
+	id: string;
+	imei: string;
+	serial: string;
+	tipo: string;
+	status: string;
+}
 
 export function AgressorForm() {
 	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const [status, setStatus] = useState("");
 	const [endereco, setEndereco] = useState("");
+	const [dispositivos, setDispositivos] = useState<Dispositivo[]>([]);
+
+	useEffect(() => {
+		fetch("/api/dispositivos")
+			.then((res) => res.json())
+			.then((data) => {
+				if (Array.isArray(data)) {
+					// Filtra apenas tornozeleiras em estoque para agressores
+					setDispositivos(data.filter((d) => d.tipo === "TORNOZELEIRA" && d.status === "ESTOQUE"));
+				}
+			})
+			.catch(console.error);
+	}, []);
 
 	async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
@@ -33,6 +55,7 @@ export function AgressorForm() {
 			telefone: formData.get("telefone"),
 			endereco: formData.get("endereco"),
 			tipo: "AGRESSOR",
+			dispositivoId: formData.get("dispositivoId") || null,
 		};
 
 		try {
@@ -106,6 +129,22 @@ export function AgressorForm() {
 								onChange={setEndereco}
 								placeholder="Digite o CEP ou Nome da Rua/Bairro para buscar..."
 							/>
+						</div>
+						<div className="space-y-2 md:col-span-2">
+							<Label htmlFor="dispositivoId">Vincular Tornozeleira Eletrônica (Opcional)</Label>
+							<select
+								id="dispositivoId"
+								name="dispositivoId"
+								className="flex h-9 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								<option value="">Nenhuma tornozeleira vinculada agora</option>
+								{dispositivos.map((d) => (
+									<option key={d.id} value={d.id}>
+										{d.serial} (IMEI: {d.imei})
+									</option>
+								))}
+							</select>
+							<p className="text-xs text-slate-500 mt-1">Apenas equipamentos no "ESTOQUE" aparecem aqui.</p>
 						</div>
 					</div>
 					<Button
