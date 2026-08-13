@@ -85,6 +85,8 @@ model Zona {
   
   horaInicio        String?         // Ex: "18:00"
   horaFim           String?         // Ex: "06:00"
+  
+  endereco          String?         // Endereço aproximado da zona
 
   ativa             Boolean         @default(true)
   criadoEm          DateTime        @default(now())

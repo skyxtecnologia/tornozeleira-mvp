@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 export async function POST(request: Request) {
 	try {
 		const body = await request.json();
-		const { medidaProtetivaId, tipo, formato, coordenadas, raioMetros } = body;
+		const { medidaProtetivaId, tipo, formato, coordenadas, raioMetros, endereco } = body;
 
 		if (!medidaProtetivaId || !tipo || !coordenadas) {
 			return NextResponse.json(
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 				formato: formato || "CIRCULO",
 				coordenadas, // String JSON [{lat, lng}]
 				raioMetros: Number(raioMetros) || null,
+				endereco: endereco || null,
 			},
 		});
 

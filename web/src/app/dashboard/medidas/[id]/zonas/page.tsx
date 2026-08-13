@@ -47,6 +47,7 @@ interface Zona {
 	formato: string;
 	coordenadas: string;
 	raioMetros: number | null;
+	endereco?: string | null;
 }
 
 interface Medida {
@@ -69,6 +70,7 @@ export default function ZonasPage({
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [novoCentro, setNovoCentro] = useState<{ lat: number; lng: number } | null>(null);
 	const [novoRaio, setNovoRaio] = useState(200);
+	const [novoEndereco, setNovoEndereco] = useState<string>("");
 
 	useEffect(() => {
 		const fetchMedida = async () => {
@@ -83,9 +85,22 @@ export default function ZonasPage({
 		fetchMedida();
 	}, [resolvedParams.id]);
 
-	const handleMapClick = (e: any) => {
+	const handleMapClick = async (e: any) => {
 		if (!isDrawing) return;
-		setNovoCentro({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+		const lat = e.lngLat.lat;
+		const lng = e.lngLat.lng;
+		setNovoCentro({ lat, lng });
+		
+		// Busca endereço aproximado
+		try {
+			const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+			if (res.ok) {
+				const data = await res.json();
+				setNovoEndereco(data.display_name || "Endereço desconhecido");
+			}
+		} catch (err) {
+			setNovoEndereco("Não foi possível buscar o endereço");
+		}
 	};
 
 	const handleSaveZona = async () => {
@@ -102,6 +117,7 @@ export default function ZonasPage({
 					formato: "CIRCULO",
 					coordenadas: JSON.stringify([novoCentro]),
 					raioMetros: novoRaio,
+					endereco: novoEndereco,
 				}),
 			});
 
@@ -113,6 +129,7 @@ export default function ZonasPage({
 				);
 				setIsDrawing(false);
 				setNovoCentro(null);
+				setNovoEndereco("");
 			}
 		} catch (error) {
 			console.error(error);
@@ -165,10 +182,15 @@ export default function ZonasPage({
 	// Calcula GeoJSON da zona sendo desenhada
 	const previewGeoJSON =
 		isDrawing && novoCentro
-			? circle([novoCentro.lng, novoCentro.lat], novoRaio, {
-					steps: 64,
-					units: "meters",
-				})
+			? {
+					type: "FeatureCollection",
+					features: [
+						circle([novoCentro.lng, novoCentro.lat], novoRaio, {
+							steps: 64,
+							units: "meters",
+						}),
+					],
+			  }
 			: null;
 
 	return (
@@ -217,7 +239,12 @@ export default function ZonasPage({
 										/>
 									</div>
 									<p className="text-xs text-slate-400">
-										{novoCentro ? "Ponto selecionado." : "Clique no mapa para definir o centro."}
+										{novoCentro ? (
+											<>
+												<strong>Ponto selecionado:</strong><br/>
+												{novoEndereco || "Buscando endereço..."}
+											</>
+										) : "Clique no mapa para definir o centro."}
 									</p>
 									<div className="flex gap-2">
 										<Button 
@@ -251,11 +278,15 @@ export default function ZonasPage({
 								) : (
 									medida.zonas.map((zona) => (
 										<div key={zona.id} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800">
-											<div className="flex items-center gap-2">
-												<ShieldAlert className="w-4 h-4 text-red-500" />
-												<div className="flex flex-col">
-													<span className="text-sm font-bold text-slate-200">Exclusão</span>
-													<span className="text-xs text-slate-500">Raio: {zona.raioMetros}m</span>
+											<div className="flex items-center gap-2 max-w-[80%]">
+												<ShieldAlert className="w-4 h-4 shrink-0 text-red-500" />
+												<div className="flex flex-col overflow-hidden">
+													<span className="text-sm font-bold text-slate-200">Exclusão (Raio: {zona.raioMetros}m)</span>
+													{zona.endereco && (
+														<span className="text-xs text-slate-500 truncate" title={zona.endereco}>
+															{zona.endereco}
+														</span>
+													)}
 												</div>
 											</div>
 											<Button
