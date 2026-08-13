@@ -14,11 +14,13 @@ import { OperadorForm } from "@/components/forms/OperadorForm";
 import { VitimaForm } from "@/components/forms/VitimaForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
 
-export default function CadastrosPage() {
+function CadastrosContent() {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const initialTab = searchParams.get("tab") || "vitimas";
+
 	return (
 		<div className="flex h-full w-full flex-col bg-slate-950 p-6 overflow-y-auto">
 			<div className="mb-6">
@@ -95,5 +97,13 @@ export default function CadastrosPage() {
 				</div>
 			</Tabs>
 		</div>
+	);
+}
+
+export default function CadastrosPage() {
+	return (
+		<Suspense fallback={<div className="flex h-full items-center justify-center bg-slate-950 text-slate-400">Carregando formulários...</div>}>
+			<CadastrosContent />
+		</Suspense>
 	);
 }
