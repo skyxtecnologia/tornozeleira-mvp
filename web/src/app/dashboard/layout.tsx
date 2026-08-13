@@ -146,7 +146,7 @@ export default function DashboardLayout({
 
 				<div className="p-2 border-t border-slate-800">
 					<NavItem
-						href="/configuracoes"
+						href="/dashboard/configuracoes"
 						icon={<Settings className="h-5 w-5 shrink-0" />}
 						label="Configurações"
 						isCollapsed={isCollapsed}
