@@ -97,8 +97,22 @@ export default function MobileTrackerPage() {
 	}, [router]);
 
 	const handlePanico = async () => {
-		alert("ALERTA DE PÂNICO ENVIADO PARA A CENTRAL!");
-		// Aqui poderíamos chamar um /api/panico real
+		if (!imei) return;
+		try {
+			const res = await fetch("/api/panico", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ imei }),
+			});
+			if (res.ok) {
+				alert("ALERTA DE PÂNICO ENVIADO PARA A CENTRAL! A Guarda Municipal foi acionada.");
+			} else {
+				alert("Erro ao enviar o alerta. Verifique sua conexão e tente novamente.");
+			}
+		} catch (error) {
+			console.error("Erro ao disparar pânico:", error);
+			alert("Erro ao enviar o alerta. Verifique sua conexão e tente novamente.");
+		}
 	};
 
 	return (
