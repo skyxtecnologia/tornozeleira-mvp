@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 interface Monitorado {
 	id: string;
@@ -20,6 +21,7 @@ interface Monitorado {
 }
 
 export function MedidaForm() {
+	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const [status, setStatus] = useState("");
 	const [vitimas, setVitimas] = useState<Monitorado[]>([]);
@@ -66,6 +68,7 @@ export function MedidaForm() {
 			if (res.ok) {
 				setStatus("Medida Protetiva cadastrada com sucesso!");
 				form.reset();
+				router.refresh();
 			} else {
 				setStatus(`Erro: ${json.error || "Falha ao cadastrar medida."}`);
 			}

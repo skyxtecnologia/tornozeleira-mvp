@@ -12,8 +12,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "./AddressAutocomplete";
+import { useRouter } from "next/navigation";
 
 export function VitimaForm() {
+	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const [status, setStatus] = useState("");
 	const [endereco, setEndereco] = useState("");
@@ -43,6 +45,7 @@ export function VitimaForm() {
 				setStatus("Vítima cadastrada com sucesso!");
 				form.reset();
 				setEndereco("");
+				router.refresh();
 			} else {
 				const json = await res.json();
 				setStatus(`Erro: ${json.error || "Falha ao cadastrar vítima."}`);

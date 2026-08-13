@@ -10,8 +10,10 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 
 export function OperadorForm() {
+	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const [success, setSuccess] = useState(false);
 	const [error, setError] = useState("");
@@ -47,6 +49,7 @@ export function OperadorForm() {
 				setSuccess(true);
 				form.reset();
 				setFormData({ nome: "", email: "", senha: "", role: "OPERADOR" });
+				router.refresh();
 			} else {
 				setError(data.error || "Erro ao registrar usuário.");
 			}

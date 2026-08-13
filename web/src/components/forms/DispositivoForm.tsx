@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 export function DispositivoForm() {
+	const router = useRouter();
 	const [loading, setLoading] = useState(false);
 	const [status, setStatus] = useState("");
 
@@ -38,6 +40,7 @@ export function DispositivoForm() {
 			if (res.ok) {
 				setStatus("Dispositivo cadastrado com sucesso!");
 				form.reset();
+				router.refresh();
 			} else {
 				setStatus("Erro ao cadastrar dispositivo.");
 			}
